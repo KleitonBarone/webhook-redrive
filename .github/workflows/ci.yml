@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: webhook_redrive_test
+          POSTGRES_USER: webhook_redrive
+          POSTGRES_PASSWORD: test-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U webhook_redrive -d webhook_redrive_test"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 15
+    env:
+      TEST_DATABASE_URL: postgres://webhook_redrive:test-only-password@localhost:5432/webhook_redrive_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.x"
+          cache: true
+      - name: Check formatting
+        run: test -z "$(gofmt -l cmd internal migrations)"
+      - name: Run static analysis
+        run: go vet ./...
+      - name: Run tests
+        run: go test -race -count=1 ./...

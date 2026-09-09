@@ -4,7 +4,7 @@
 
 Webhook Redrive is a reliable webhook delivery service. The hard parts are delivery state, retries, duplicate handling, signatures, and enough telemetry to explain every attempt.
 
-Read `README.md` and `ROADMAP.md` before changing scope. This repository is in planning, so never describe a planned capability as implemented.
+Read `README.md` and `ROADMAP.md` before changing scope. Milestones 0 and 1 are implemented. Never describe milestone 2 or later capabilities as implemented.
 
 ## Product rules
 
@@ -19,11 +19,19 @@ Read `README.md` and `ROADMAP.md` before changing scope. This repository is in p
 
 Start with one HTTP service, one worker process, and one durable database. Do not add a broker, scheduler cluster, Kubernetes, or multiple deployable services without a measured limitation and an architecture decision.
 
-The initial runtime and framework have not been selected. Record that decision before scaffolding. If TypeScript is selected, use strict mode, inferred types, and no `any` escape hatches.
+The repository uses Go 1.24, `net/http`, pgx v5, and PostgreSQL 17. Keep one Go module with `cmd/api`, `cmd/worker`, and `cmd/receiver`. See `docs/decisions/0001-foundation.md` before changing these choices.
 
 ## Verification
 
-There are no build or test commands yet. Add real commands here when the toolchain exists. Do not add placeholder scripts that always pass.
+Run the local checks with:
+
+```console
+gofmt -w cmd internal migrations
+go vet ./...
+go test -race -count=1 ./...
+```
+
+PostgreSQL integration tests require `TEST_DATABASE_URL`. Start the local database with `docker compose up -d postgres`. CI always sets the test URL and runs the complete suite.
 
 Prioritize tests for state transitions, retry timing, concurrent claims, crash recovery, signature verification, rate limits, and replay. Use a controllable clock and deterministic jitter in tests.
 

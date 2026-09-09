@@ -1,0 +1,63 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: webhook_redrive
+      POSTGRES_USER: webhook_redrive
+      POSTGRES_PASSWORD: local-only-password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U webhook_redrive -d webhook_redrive"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  receiver:
+    build:
+      context: .
+      target: receiver
+    environment:
+      RECEIVER_SECRET: local-demo-secret-32-bytes-long
+      RECEIVER_DELAY: 3s
+    ports:
+      - "9090:9090"
+
+  api:
+    build:
+      context: .
+      target: api
+    environment:
+      DATABASE_URL: postgres://webhook_redrive:local-only-password@postgres:5432/webhook_redrive?sslmode=disable
+      MASTER_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  worker:
+    build:
+      context: .
+      target: worker
+    environment:
+      DATABASE_URL: postgres://webhook_redrive:local-only-password@postgres:5432/webhook_redrive?sslmode=disable
+      MASTER_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      OUTBOUND_TIMEOUT: 2s
+      CLAIM_LEASE: 10s
+      POLL_PERIOD: 250ms
+    depends_on:
+      api:
+        condition: service_healthy
+      receiver:
+        condition: service_started
+
+volumes:
+  postgres-data:

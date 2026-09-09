@@ -4,21 +4,23 @@ This roadmap favors a small, explainable delivery system before distributed infr
 
 ## 0. Foundation
 
-- [ ] Record the runtime, database, and repository-shape decisions
-- [ ] Add formatting, static checks, focused tests, and CI
-- [ ] Provide one-command local dependencies
-- [ ] Document the delivery state machine
+- [x] Record the runtime, database, and repository-shape decisions
+- [x] Add formatting, static checks, focused tests, and CI
+- [x] Provide one-command local dependencies
+- [x] Document the delivery state machine
 
 ## 1. First usable delivery loop
 
-- [ ] Register webhook endpoints and secrets
-- [ ] Accept events through an HTTP API
-- [ ] Persist events and delivery attempts atomically
-- [ ] Claim pending attempts safely from concurrent workers
-- [ ] Send HMAC-signed requests with bounded timeouts
-- [ ] Expose delivery history and current state
+- [x] Register webhook endpoints and encrypted secrets
+- [x] Accept events through an HTTP API
+- [x] Persist events and delivery attempts atomically
+- [x] Claim pending attempts safely from concurrent workers
+- [x] Send exact-byte HMAC-signed requests with bounded timeouts
+- [x] Expose delivery history and current state
 
 ## 2. Failure handling
+
+Milestone 1 records failures as terminal. Milestone 2 starts with the classification rules that decide whether a later attempt is allowed.
 
 - [ ] Classify retryable and terminal responses
 - [ ] Add exponential backoff with jitter
@@ -30,7 +32,7 @@ This roadmap favors a small, explainable delivery system before distributed infr
 
 - [ ] Add traces across ingestion, queueing, and delivery
 - [ ] Publish queue depth, success rate, latency, and retry metrics
-- [ ] Add structured logs with payload redaction
+- [x] Add structured logs with payload redaction
 - [ ] Provide a failure simulator for timeouts, `429`, and `500` responses
 - [ ] Publish reproducible load-test results
 
