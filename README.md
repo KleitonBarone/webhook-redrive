@@ -4,6 +4,8 @@ Webhook Redrive accepts events, signs outbound requests, and keeps delivery hist
 
 Milestones 0 through 2 are implemented. The project is a local portfolio demo with no API authentication.
 
+Milestone 3 tracing, metrics, and local load checks are implemented; the measured results are being collected.
+
 ## Run the demo
 
 Requires Docker Compose and PowerShell 7 for the verification script.
@@ -19,6 +21,8 @@ The script verifies two scenarios:
 - A receiver fails three times and the event becomes `dead_letter`. A manual replay succeeds. Submitting the replay request twice creates one attempt, with an actor and reason in history.
 
 All seven deliveries must carry valid signatures and identical body bytes. The script exits with an error if any assertion fails. PostgreSQL, API, and receiver ports bind to loopback only. Stop the stack with `docker compose down`; the database volume remains.
+
+The demo also verifies trace propagation and `/metrics`. Follow trace IDs through ingestion, queueing, retries, and replay using `docker compose logs --no-log-prefix api worker`. [Telemetry instructions](docs/observability.md) explain the spans, metric definitions, and load checks.
 
 The synthetic receiver supports `/success`, `/reject` for HTTP 400, `/fail` for HTTP 500, `/rate-limit` for HTTP 429 with a one-second `Retry-After`, `/timeout`, and `/flaky?failures=2`. Flaky counts are per event ID and reset when the receiver restarts. `GET http://localhost:9090/deliveries` reports signatures, status codes, and body hashes without returning payloads.
 
@@ -106,9 +110,9 @@ go test -race -count=1 ./...
 
 The race detector requires CGO and a C compiler. Tests create and drop uniquely named schemas; the test database role needs permission to create schemas. Existing demo tables are not truncated. Integration tests skip when the URL is absent locally and fail if it is absent in CI.
 
-The API and worker require `DATABASE_URL` and `MASTER_KEY`, a base64-encoded 32-byte AES key. Compose supplies synthetic local values. Worker defaults are `OUTBOUND_TIMEOUT=2s`, `CLAIM_LEASE=10s`, `POLL_PERIOD=250ms`, and `BATCH_SIZE=10`. The lease must exceed the request timeout; batch size must be 1..1000. `API_ADDR` defaults to `:8080`.
+The API and worker require `DATABASE_URL` and `MASTER_KEY`, a base64-encoded 32-byte AES key. Compose supplies synthetic local values. Worker defaults are `OUTBOUND_TIMEOUT=2s`, `CLAIM_LEASE=10s`, `POLL_PERIOD=250ms`, and `BATCH_SIZE=10`. The lease must exceed the request timeout; batch size must be 1..1000. `API_ADDR` defaults to `:8080`. Both processes export OpenTelemetry spans to stdout by default; set `TRACE_EXPORTER=none` to disable export.
 
-Both binaries apply embedded migrations at startup under an advisory lock. For an existing milestone 1 database, stop the API and worker, rebuild, and start both together. Migration 002 preserves event history and leaves existing failures terminal until replayed. Mixed versions are unsupported.
+Both binaries apply embedded migrations at startup under an advisory lock. To upgrade, stop the API and worker, rebuild, and start both together. Migration 002 preserves event history and leaves existing failures terminal until replayed. Migration 003 adds durable trace context; older attempts begin without an ingestion trace. Mixed versions are unsupported.
 
 ## Next milestone
 

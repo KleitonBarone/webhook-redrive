@@ -73,9 +73,12 @@ $digest = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData(
     [Text.Encoding]::UTF8.GetBytes('{"order_id":"demo-42","amount":1250}')
 )).ToLowerInvariant()
 if (@($received | Where-Object { $_.body_sha256 -ne $digest }).Count -gt 0) { throw "Body bytes changed in transit." }
+if (@($received | Where-Object { $_.trace_id -notmatch '^[0-9a-f]{32}$' }).Count -gt 0) { throw "Delivery trace context is missing." }
+$metrics = (Invoke-WebRequest "$BaseUrl/metrics").Content
+if ($metrics -notmatch 'webhook_attempts_completed_total' -or $metrics -notmatch 'webhook_queue_depth') { throw "Delivery metrics are missing." }
 
 @(
     [pscustomobject]@{ scenario = "retry recovery"; event_id = $eventual.id; state = "succeeded"; attempts = 3 }
     [pscustomobject]@{ scenario = "dead letter then replay"; event_id = $exhausted.id; state = "succeeded"; attempts = 4 }
 ) | Format-Table -AutoSize
-Write-Output "Verified seven signed deliveries, unchanged body bytes, and one audited replay."
+Write-Output "Verified seven signed deliveries, unchanged body bytes, trace context, metrics, and one audited replay."

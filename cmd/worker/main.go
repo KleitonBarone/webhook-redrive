@@ -16,6 +16,7 @@ import (
 	"github.com/KleitonBarone/webhook-redrive/internal/logsafe"
 	"github.com/KleitonBarone/webhook-redrive/internal/secret"
 	"github.com/KleitonBarone/webhook-redrive/internal/store"
+	"github.com/KleitonBarone/webhook-redrive/internal/telemetry"
 )
 
 func main() {
@@ -27,6 +28,15 @@ func main() {
 }
 
 func run(logger *slog.Logger) error {
+	provider, err := telemetry.Provider("webhook-worker", config.String("TRACE_EXPORTER", "stdout"), os.Stdout)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = provider.Shutdown(ctx)
+	}()
 	databaseURL, err := config.Required("DATABASE_URL")
 	if err != nil {
 		return err
@@ -75,6 +85,7 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	worker, err := delivery.NewWorker(dataStore, box, serviceClock, logger, delivery.Config{
+		Tracer:   provider.Tracer("webhook-redrive"),
 		WorkerID: workerID, Lease: lease, BatchSize: batchSize,
 		PollPeriod: pollPeriod, RequestTimeout: requestTimeout,
 	})

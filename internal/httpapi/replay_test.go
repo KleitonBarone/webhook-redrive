@@ -15,7 +15,7 @@ func TestReplayAndEndpointValidation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	api := New(&fakeStore{}, box, apiClock{now: time.Unix(100, 0)}, discardLogger())
+	api := New(&fakeStore{}, box, apiClock{now: time.Unix(100, 0)}, discardLogger(), nil)
 	uuid := "7d178c7d-cbdd-4e47-a158-69e2f5c89770"
 	for _, test := range []struct {
 		path, body string

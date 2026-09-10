@@ -26,6 +26,10 @@ type fakeStore struct {
 	attemptID        string
 }
 
+func (s *fakeStore) Metrics(context.Context, time.Time) (store.MetricsSnapshot, error) {
+	return store.MetricsSnapshot{}, nil
+}
+
 func (s *fakeStore) Replay(_ context.Context, eventID string, input store.ReplayRequest, _ time.Time) (store.ReplayResult, error) {
 	return store.ReplayResult{EventID: eventID, AttemptID: input.AttemptID, RequestID: input.RequestID}, nil
 }
@@ -61,7 +65,7 @@ func TestEndpointRegistrationEncryptsSecretAndDoesNotReturnIt(t *testing.T) {
 	t.Parallel()
 	dataStore := &fakeStore{}
 	box, _ := secret.NewBox(make([]byte, secret.KeySize))
-	handler := New(dataStore, box, apiClock{now: time.Unix(100, 0)}, discardLogger())
+	handler := New(dataStore, box, apiClock{now: time.Unix(100, 0)}, discardLogger(), nil)
 	plaintext := "synthetic-secret-32-bytes-long"
 	request := httptest.NewRequest(http.MethodPost, "/v1/endpoints", bytes.NewBufferString(
 		`{"url":"https://example.test/hooks","secret":"`+plaintext+`"}`,
@@ -88,7 +92,7 @@ func TestEventIngestionPreservesExactJSONBytes(t *testing.T) {
 	t.Parallel()
 	dataStore := &fakeStore{}
 	box, _ := secret.NewBox(make([]byte, secret.KeySize))
-	handler := New(dataStore, box, apiClock{now: time.Unix(100, 0)}, discardLogger())
+	handler := New(dataStore, box, apiClock{now: time.Unix(100, 0)}, discardLogger(), nil)
 	payload := []byte("{\n  \"customer\": \"demo\", \"amount\": 42\n}\n")
 	request := httptest.NewRequest(http.MethodPost, "/v1/endpoints/7d178c7d-cbdd-4e47-a158-69e2f5c89770/events", bytes.NewReader(payload))
 	request.Header.Set("X-Event-Type", "invoice.created")

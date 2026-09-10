@@ -16,6 +16,10 @@ import (
 	"github.com/KleitonBarone/webhook-redrive/internal/id"
 	"github.com/KleitonBarone/webhook-redrive/internal/secret"
 	"github.com/KleitonBarone/webhook-redrive/internal/store"
+	"github.com/KleitonBarone/webhook-redrive/internal/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 )
 
 const (
@@ -24,6 +28,7 @@ const (
 )
 
 type dataStore interface {
+	Metrics(context.Context, time.Time) (store.MetricsSnapshot, error)
 	CreateEndpoint(context.Context, store.Endpoint, []byte) error
 	EndpointExists(context.Context, string) (bool, error)
 	CreateEvent(context.Context, store.Event, []byte, string) error
@@ -34,21 +39,26 @@ type dataStore interface {
 }
 
 type API struct {
+	tracer trace.Tracer
 	store  dataStore
 	box    *secret.Box
 	clock  clock.Clock
 	logger *slog.Logger
 }
 
-func New(dataStore dataStore, box *secret.Box, serviceClock clock.Clock, logger *slog.Logger) http.Handler {
-	api := &API{store: dataStore, box: box, clock: serviceClock, logger: logger}
+func New(dataStore dataStore, box *secret.Box, serviceClock clock.Clock, logger *slog.Logger, tracer trace.Tracer) http.Handler {
+	if tracer == nil {
+		tracer = noop.NewTracerProvider().Tracer("api")
+	}
+	api := &API{store: dataStore, box: box, clock: serviceClock, logger: logger, tracer: tracer}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", api.health)
+	mux.HandleFunc("GET /metrics", api.metrics)
 	mux.HandleFunc("POST /v1/endpoints", api.createEndpoint)
-	mux.HandleFunc("POST /v1/endpoints/{endpointID}/events", api.createEvent)
+	mux.HandleFunc("POST /v1/endpoints/{endpointID}/events", api.traced("webhook.ingest", api.createEvent))
 	mux.HandleFunc("GET /v1/events/{eventID}", api.getEvent)
 	mux.HandleFunc("GET /v1/events/{eventID}/attempts", api.listAttempts)
-	mux.HandleFunc("POST /v1/events/{eventID}/replays", api.replay)
+	mux.HandleFunc("POST /v1/events/{eventID}/replays", api.traced("webhook.replay", api.replay))
 	mux.HandleFunc("GET /v1/dead-letters", api.deadLetters)
 	return api.logRequests(mux)
 }
@@ -102,6 +112,8 @@ func (a *API) createEndpoint(w http.ResponseWriter, request *http.Request) {
 }
 
 func (a *API) createEvent(w http.ResponseWriter, request *http.Request) {
+	ctx := request.Context()
+	span := trace.SpanFromContext(ctx)
 	endpointID := request.PathValue("endpointID")
 	if !validID(w, endpointID) {
 		return
@@ -143,6 +155,8 @@ func (a *API) createEvent(w http.ResponseWriter, request *http.Request) {
 		a.internalError(w, request, "create event", err)
 		return
 	}
+	span.SetAttributes(attribute.String("event.id", eventID), attribute.String("attempt.id", attemptID))
+	a.logger.InfoContext(ctx, "event accepted", "event_id", eventID, "trace_id", telemetry.TraceID(ctx))
 	writeJSON(w, http.StatusAccepted, event)
 }
 
@@ -185,7 +199,7 @@ func (a *API) internalError(w http.ResponseWriter, request *http.Request, operat
 
 func (a *API) logRequests(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
-		if request.URL.Path == "/healthz" {
+		if request.URL.Path == "/healthz" || request.URL.Path == "/metrics" {
 			next.ServeHTTP(w, request)
 			return
 		}

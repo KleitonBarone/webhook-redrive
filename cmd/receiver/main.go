@@ -17,11 +17,13 @@ import (
 	"github.com/KleitonBarone/webhook-redrive/internal/config"
 	"github.com/KleitonBarone/webhook-redrive/internal/logsafe"
 	"github.com/KleitonBarone/webhook-redrive/internal/signature"
+	"github.com/KleitonBarone/webhook-redrive/internal/telemetry"
 )
 
 const maxReceiverBody = 1 << 20
 
 type receivedDelivery struct {
+	TraceID        string    `json:"trace_id,omitempty"`
 	ResponseStatus int       `json:"response_status"`
 	EventID        string    `json:"event_id"`
 	EventType      string    `json:"event_type"`
@@ -74,6 +76,7 @@ func main() {
 
 func (r *receiver) deliver(status int, delay time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, request *http.Request) {
+		ctx := telemetry.Extract(request.Context(), request.Header.Get("traceparent"))
 		responseStatus := status
 		failures := 2
 		if request.URL.Path == "/flaky" && request.URL.Query().Has("failures") {
@@ -100,6 +103,7 @@ func (r *receiver) deliver(status int, delay time.Duration) http.HandlerFunc {
 		)
 		digest := sha256.Sum256(body)
 		delivery := receivedDelivery{
+			TraceID:        telemetry.TraceID(ctx),
 			EventID:        request.Header.Get("X-Webhook-ID"),
 			EventType:      request.Header.Get("X-Webhook-Event"),
 			BodySHA256:     hex.EncodeToString(digest[:]),
@@ -124,6 +128,7 @@ func (r *receiver) deliver(status int, delay time.Duration) http.HandlerFunc {
 		count := len(r.deliveries)
 		r.mu.Unlock()
 		r.logger.InfoContext(request.Context(), "synthetic delivery received",
+			"trace_id", delivery.TraceID,
 			"event_id", delivery.EventID,
 			"signature_valid", delivery.SignatureValid,
 			"delivery_count", count,

@@ -7,6 +7,9 @@ import (
 
 	"github.com/KleitonBarone/webhook-redrive/internal/id"
 	"github.com/KleitonBarone/webhook-redrive/internal/store"
+	"github.com/KleitonBarone/webhook-redrive/internal/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func validID(w http.ResponseWriter, value string) bool {
@@ -18,6 +21,8 @@ func validID(w http.ResponseWriter, value string) bool {
 }
 
 func (a *API) replay(w http.ResponseWriter, request *http.Request) {
+	ctx := request.Context()
+	span := trace.SpanFromContext(ctx)
 	eventID := request.PathValue("eventID")
 	if !validID(w, eventID) {
 		return
@@ -44,6 +49,8 @@ func (a *API) replay(w http.ResponseWriter, request *http.Request) {
 	case err != nil:
 		a.internalError(w, request, "replay event", err)
 	default:
+		span.SetAttributes(attribute.String("event.id", eventID), attribute.String("attempt.id", result.AttemptID))
+		a.logger.InfoContext(ctx, "replay accepted", "event_id", eventID, "attempt_id", result.AttemptID, "trace_id", telemetry.TraceID(ctx))
 		writeJSON(w, http.StatusAccepted, result)
 	}
 }

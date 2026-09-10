@@ -8,6 +8,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/KleitonBarone/webhook-redrive/internal/telemetry"
 	"github.com/KleitonBarone/webhook-redrive/migrations"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -38,6 +39,7 @@ type Event struct {
 }
 
 type Attempt struct {
+	TraceParent     string     `json:"trace_parent,omitempty"`
 	AttemptNumber   int        `json:"attempt_number"`
 	CycleAttempt    int        `json:"cycle_attempt"`
 	MaxAttempts     int        `json:"max_attempts"`
@@ -61,6 +63,9 @@ type Attempt struct {
 }
 
 type ClaimedDelivery struct {
+	TraceParent      string
+	QueuedAt         time.Time
+	AvailableAt      time.Time
 	CycleAttempt     int
 	LeaseUntil       time.Time
 	AttemptID        string
@@ -177,8 +182,8 @@ func (s *Store) CreateEvent(ctx context.Context, event Event, payload []byte, at
 	}
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO delivery_attempts (
-			id, event_id, state, available_at, created_at, updated_at, endpoint_id, max_attempts
-		) SELECT $1, $2, 'pending', $3, $3, $3, id, max_attempts FROM webhook_endpoints WHERE id=$4`, attemptID, event.ID, event.CreatedAt, event.EndpointID); err != nil {
+			id, event_id, state, available_at, created_at, updated_at, endpoint_id, max_attempts, trace_parent
+		) SELECT $1, $2, 'pending', $3, $3, $3, id, max_attempts, $5 FROM webhook_endpoints WHERE id=$4`, attemptID, event.ID, event.CreatedAt, event.EndpointID, telemetry.Parent(ctx)); err != nil {
 		return fmt.Errorf("insert delivery attempt: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -220,7 +225,7 @@ func (s *Store) ListAttempts(ctx context.Context, eventID string) ([]Attempt, er
 		SELECT id, event_id, state, claim_count, last_started_at, completed_at,
 		       response_status, error_code, error_message, created_at, updated_at,
 		       attempt_number, cycle_attempt, max_attempts, available_at, retryable,
-		       replay_of, replay_request_id, replay_actor, replay_reason
+		       replay_of, replay_request_id, replay_actor, replay_reason, trace_parent
 		FROM delivery_attempts
 		WHERE event_id = $1
 		ORDER BY attempt_number`, eventID)
@@ -253,6 +258,7 @@ func (s *Store) ListAttempts(ctx context.Context, eventID string) ([]Attempt, er
 			&attempt.ReplayRequestID,
 			&attempt.ReplayActor,
 			&attempt.ReplayReason,
+			&attempt.TraceParent,
 		); err != nil {
 			return nil, fmt.Errorf("scan attempt: %w", err)
 		}

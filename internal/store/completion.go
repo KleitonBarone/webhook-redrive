@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/KleitonBarone/webhook-redrive/internal/id"
+	"github.com/KleitonBarone/webhook-redrive/internal/telemetry"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type Outcome struct {
@@ -62,9 +64,9 @@ func (s *Store) Complete(ctx context.Context, claim ClaimedDelivery, workerID st
 			return false, err
 		}
 		_, err = tx.Exec(ctx, `INSERT INTO delivery_attempts
-            (id,event_id,endpoint_id,state,attempt_number,cycle_attempt,max_attempts,available_at,created_at,updated_at)
-            VALUES ($1,$2,$3,'pending',$4,$5,$6,$7,$8,$8)`,
-			nextID, claim.EventID, endpointID, number+1, cycle+1, maximum, outcome.RetryAt, now)
+            (id,event_id,endpoint_id,state,attempt_number,cycle_attempt,max_attempts,available_at,created_at,updated_at,trace_parent)
+            VALUES ($1,$2,$3,'pending',$4,$5,$6,$7,$8,$8,$9)`,
+			nextID, claim.EventID, endpointID, number+1, cycle+1, maximum, outcome.RetryAt, now, telemetry.Parent(ctx))
 		if err != nil {
 			return false, fmt.Errorf("schedule retry: %w", err)
 		}
@@ -118,15 +120,18 @@ func (s *Store) Replay(ctx context.Context, eventID string, input ReplayRequest,
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return ReplayResult{}, err
 	}
-	var latestID, state string
+	var latestID, state, parent string
 	var number, maximum int
-	err = tx.QueryRow(ctx, `SELECT id,state,attempt_number,max_attempts FROM delivery_attempts
-        WHERE event_id=$1 ORDER BY attempt_number DESC LIMIT 1`, eventID).Scan(&latestID, &state, &number, &maximum)
+	err = tx.QueryRow(ctx, `SELECT id,state,attempt_number,max_attempts,trace_parent FROM delivery_attempts
+		WHERE event_id=$1 ORDER BY attempt_number DESC LIMIT 1`, eventID).Scan(&latestID, &state, &number, &maximum, &parent)
 	if err != nil {
 		return ReplayResult{}, err
 	}
 	if latestID != input.AttemptID || (state != "failed" && state != "dead_letter") {
 		return ReplayResult{}, ErrConflict
+	}
+	if sc := trace.SpanContextFromContext(telemetry.Extract(ctx, parent)); sc.IsValid() {
+		trace.SpanFromContext(ctx).AddLink(trace.Link{SpanContext: sc})
 	}
 	nextID, err := id.New()
 	if err != nil {
@@ -134,9 +139,9 @@ func (s *Store) Replay(ctx context.Context, eventID string, input ReplayRequest,
 	}
 	_, err = tx.Exec(ctx, `INSERT INTO delivery_attempts
         (id,event_id,endpoint_id,state,attempt_number,cycle_attempt,max_attempts,available_at,created_at,updated_at,
-         replay_of,replay_request_id,replay_actor,replay_reason)
-        VALUES ($1,$2,$3,'pending',$4,1,$5,$6,$6,$6,$7,$8,$9,$10)`,
-		nextID, eventID, endpointID, number+1, maximum, now, input.AttemptID, input.RequestID, input.Actor, input.Reason)
+         replay_of,replay_request_id,replay_actor,replay_reason,trace_parent)
+        VALUES ($1,$2,$3,'pending',$4,1,$5,$6,$6,$6,$7,$8,$9,$10,$11)`,
+		nextID, eventID, endpointID, number+1, maximum, now, input.AttemptID, input.RequestID, input.Actor, input.Reason, telemetry.Parent(ctx))
 	if err != nil {
 		var postgresError *pgconn.PgError
 		if errors.As(err, &postgresError) && postgresError.Code == "23505" {

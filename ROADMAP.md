@@ -30,8 +30,8 @@ Implemented with durable retry scheduling, bounded budgets, audited replay, and 
 
 ## 3. Operability
 
-- [ ] Add traces across ingestion, queueing, and delivery
-- [ ] Publish queue depth, success rate, latency, and retry metrics
+- [x] Add traces across ingestion, queueing, and delivery
+- [x] Publish queue depth, success rate, latency, and retry metrics
 - [x] Add structured logs with payload redaction
 - [x] Provide a failure simulator for timeouts, `429`, and `500` responses
 - [ ] Publish reproducible load-test results

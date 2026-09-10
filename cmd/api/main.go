@@ -16,6 +16,7 @@ import (
 	"github.com/KleitonBarone/webhook-redrive/internal/logsafe"
 	"github.com/KleitonBarone/webhook-redrive/internal/secret"
 	"github.com/KleitonBarone/webhook-redrive/internal/store"
+	"github.com/KleitonBarone/webhook-redrive/internal/telemetry"
 )
 
 func main() {
@@ -27,6 +28,15 @@ func main() {
 }
 
 func run(logger *slog.Logger) error {
+	provider, err := telemetry.Provider("webhook-api", config.String("TRACE_EXPORTER", "stdout"), os.Stdout)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = provider.Shutdown(ctx)
+	}()
 	databaseURL, err := config.Required("DATABASE_URL")
 	if err != nil {
 		return err
@@ -54,13 +64,15 @@ func run(logger *slog.Logger) error {
 
 	server := &http.Server{
 		Addr:              config.String("API_ADDR", ":8080"),
-		Handler:           httpapi.New(dataStore, box, serviceClock, logger),
+		Handler:           httpapi.New(dataStore, box, serviceClock, logger, provider.Tracer("webhook-redrive")),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
+	stopped := make(chan struct{})
 	go func() {
+		defer close(stopped)
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
@@ -70,5 +82,6 @@ func run(logger *slog.Logger) error {
 	if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
+	<-stopped
 	return nil
 }

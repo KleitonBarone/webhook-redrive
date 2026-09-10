@@ -65,7 +65,8 @@ func (s *Store) ClaimAvailable(ctx context.Context, workerID string, now time.Ti
                 FROM candidates WHERE a.id=candidates.id RETURNING a.*
             )
             SELECT c.id, e.id, e.event_type, e.payload, endpoint.id, endpoint.url,
-                   endpoint.secret_ciphertext, c.claim_count, c.cycle_attempt, c.lease_until
+                   endpoint.secret_ciphertext, c.claim_count, c.cycle_attempt, c.lease_until,
+                   c.trace_parent, c.created_at, c.available_at
             FROM claimed c JOIN events e ON e.id=c.event_id
             JOIN webhook_endpoints endpoint ON endpoint.id=c.endpoint_id`,
 			endpointID, now, take, now.Add(lease), workerID)
@@ -75,7 +76,8 @@ func (s *Store) ClaimAvailable(ctx context.Context, workerID string, now time.Ti
 		batch, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (ClaimedDelivery, error) {
 			var d ClaimedDelivery
 			err := row.Scan(&d.AttemptID, &d.EventID, &d.EventType, &d.Payload,
-				&d.EndpointID, &d.EndpointURL, &d.SecretCiphertext, &d.ClaimCount, &d.CycleAttempt, &d.LeaseUntil)
+				&d.EndpointID, &d.EndpointURL, &d.SecretCiphertext, &d.ClaimCount, &d.CycleAttempt, &d.LeaseUntil,
+				&d.TraceParent, &d.QueuedAt, &d.AvailableAt)
 			return d, err
 		})
 		if err != nil {

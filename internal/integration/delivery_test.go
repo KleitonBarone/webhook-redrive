@@ -58,7 +58,7 @@ func TestHTTPRetryDeadLetterReplayAndRedaction(t *testing.T) {
 	}
 	var logs lockedBuffer
 	logger := slog.New(logsafe.New(slog.NewJSONHandler(&logs, nil)))
-	api := httptest.NewServer(httpapi.New(s, box, c, logger))
+	api := httptest.NewServer(httpapi.New(s, box, c, logger, nil))
 	defer api.Close()
 	const endpointSecret = "synthetic-secret-never-in-logs"
 	payload := []byte("{\n \"private\":\"payload-never-in-logs\"\n}\n")
