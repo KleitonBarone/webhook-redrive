@@ -5,28 +5,27 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
+	"math/rand/v2"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/KleitonBarone/webhook-redrive/internal/clock"
+	"github.com/KleitonBarone/webhook-redrive/internal/retry"
 	"github.com/KleitonBarone/webhook-redrive/internal/secret"
 	"github.com/KleitonBarone/webhook-redrive/internal/signature"
 	"github.com/KleitonBarone/webhook-redrive/internal/store"
 )
 
-const maxResponseDrain = 4 << 10
-
 type attemptStore interface {
 	ClaimAvailable(context.Context, string, time.Time, time.Duration, int) ([]store.ClaimedDelivery, error)
-	CompleteSuccess(context.Context, string, string, time.Time, int) (bool, error)
-	CompleteFailure(context.Context, string, string, time.Time, int, string, string) (bool, error)
+	Complete(context.Context, store.ClaimedDelivery, string, time.Time, store.Outcome) (bool, error)
 }
 
 type Worker struct {
+	jitter     func() float64
 	store      attemptStore
 	box        *secret.Box
 	client     *http.Client
@@ -39,6 +38,7 @@ type Worker struct {
 }
 
 type Config struct {
+	Jitter         func() float64
 	WorkerID       string
 	Lease          time.Duration
 	BatchSize      int
@@ -56,14 +56,21 @@ func NewWorker(dataStore attemptStore, box *secret.Box, serviceClock clock.Clock
 	if config.Lease <= config.RequestTimeout {
 		return nil, errors.New("lease must be longer than request timeout")
 	}
-	if config.BatchSize <= 0 {
-		return nil, errors.New("batch size must be positive")
+	if config.BatchSize <= 0 || config.BatchSize > 1000 {
+		return nil, errors.New("batch size must be between 1 and 1000")
 	}
 	if config.PollPeriod <= 0 {
 		return nil, errors.New("poll period must be positive")
 	}
+	if config.Jitter == nil {
+		config.Jitter = rand.Float64
+	}
 	return &Worker{
-		store: dataStore, box: box, client: &http.Client{Timeout: config.RequestTimeout},
+		jitter: config.Jitter,
+		store:  dataStore, box: box, client: &http.Client{
+			Timeout:       config.RequestTimeout,
+			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+		},
 		clock: serviceClock, logger: logger, workerID: config.WorkerID,
 		lease: config.Lease, batchSize: config.BatchSize, pollPeriod: config.PollPeriod,
 	}, nil
@@ -112,70 +119,77 @@ func (w *Worker) RunOnce(ctx context.Context) (int, error) {
 }
 
 func (w *Worker) deliver(ctx context.Context, attempt store.ClaimedDelivery) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	// A delayed goroutine must not dispatch after its claim has expired.
+	remaining := attempt.LeaseUntil.Sub(w.clock.Now())
+	if remaining <= 0 {
+		return errors.New("attempt lease expired before dispatch")
+	}
+	sendCtx, cancel := context.WithTimeout(ctx, remaining)
+	defer cancel()
+	outcome := store.Outcome{}
 	endpointSecret, err := w.box.Decrypt(attempt.SecretCiphertext)
 	if err != nil {
-		return w.fail(ctx, attempt, 0, "secret_decryption", "endpoint secret could not be decrypted")
+		outcome.Code, outcome.Message = "secret_decryption", "endpoint secret could not be decrypted"
+		return w.finish(ctx, attempt, outcome)
 	}
 	sentAt := w.clock.Now()
-	timestamp := strconv.FormatInt(sentAt.Unix(), 10)
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, attempt.EndpointURL, bytes.NewReader(attempt.Payload))
+	request, err := http.NewRequestWithContext(sendCtx, http.MethodPost, attempt.EndpointURL, bytes.NewReader(attempt.Payload))
 	if err != nil {
-		return w.fail(ctx, attempt, 0, "invalid_endpoint", "endpoint URL could not be used")
+		outcome.Code, outcome.Message = "invalid_endpoint", "endpoint URL could not be used"
+		return w.finish(ctx, attempt, outcome)
 	}
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("User-Agent", "webhook-redrive/0.1")
+	request.Header.Set("User-Agent", "webhook-redrive/0.2")
 	request.Header.Set("X-Webhook-Event", attempt.EventType)
 	request.Header.Set("X-Webhook-ID", attempt.EventID)
-	request.Header.Set("X-Webhook-Timestamp", timestamp)
+	request.Header.Set("X-Webhook-Timestamp", strconv.FormatInt(sentAt.Unix(), 10))
 	request.Header.Set("X-Webhook-Signature", signature.Sign(endpointSecret, sentAt, attempt.Payload))
-
 	response, err := w.client.Do(request)
 	if err != nil {
-		code, message := transportFailure(err)
-		return w.fail(ctx, attempt, 0, code, message)
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		outcome.Code, outcome.Message = "request_error", "outbound request failed"
+		if errors.Is(err, context.DeadlineExceeded) {
+			outcome.Code, outcome.Message = "timeout", "outbound request timed out"
+		}
+		if retry.Transport(err) {
+			outcome.RetryAt = w.retryAt(attempt, "")
+		}
+	} else {
+		// Response bodies are not part of the acknowledgement contract.
+		// Closing immediately avoids waiting on an unbounded response stream.
+		_ = response.Body.Close()
+		outcome.Status = response.StatusCode
+		if response.StatusCode < 200 || response.StatusCode >= 300 {
+			outcome.Code, outcome.Message = "http_status", fmt.Sprintf("endpoint returned HTTP %d", response.StatusCode)
+			if retry.Status(response.StatusCode) {
+				outcome.RetryAt = w.retryAt(attempt, response.Header.Get("Retry-After"))
+			}
+		}
 	}
-	_, _ = io.CopyN(io.Discard, response.Body, maxResponseDrain)
-	_ = response.Body.Close()
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return w.fail(ctx, attempt, response.StatusCode, "http_status", fmt.Sprintf("endpoint returned HTTP %d", response.StatusCode))
-	}
-	updated, err := w.store.CompleteSuccess(ctx, attempt.AttemptID, w.workerID, w.clock.Now(), response.StatusCode)
+	return w.finish(ctx, attempt, outcome)
+}
+
+func (w *Worker) retryAt(attempt store.ClaimedDelivery, retryAfter string) *time.Time {
+	now := w.clock.Now()
+	due := now.Add(max(retry.Delay(attempt.CycleAttempt, w.jitter()), retry.After(retryAfter, now)))
+	return &due
+}
+
+func (w *Worker) finish(ctx context.Context, attempt store.ClaimedDelivery, outcome store.Outcome) error {
+	updated, err := w.store.Complete(ctx, attempt, w.workerID, w.clock.Now(), outcome)
 	if err != nil {
 		return err
 	}
 	if !updated {
-		return errors.New("attempt lease was lost before success could be recorded")
+		return errors.New("attempt lease was lost before completion could be recorded")
 	}
-	w.logger.InfoContext(ctx, "delivery succeeded",
-		"event_id", attempt.EventID,
-		"attempt_id", attempt.AttemptID,
-		"claim_count", attempt.ClaimCount,
-		"response_status", response.StatusCode,
-	)
+	w.logger.InfoContext(ctx, "delivery completed",
+		"event_id", attempt.EventID, "attempt_id", attempt.AttemptID,
+		"claim_count", attempt.ClaimCount, "response_status", outcome.Status, "error_code", outcome.Code)
 	return nil
-}
-
-func (w *Worker) fail(ctx context.Context, attempt store.ClaimedDelivery, status int, code, message string) error {
-	updated, err := w.store.CompleteFailure(ctx, attempt.AttemptID, w.workerID, w.clock.Now(), status, code, message)
-	if err != nil {
-		return err
-	}
-	if !updated {
-		return errors.New("attempt lease was lost before failure could be recorded")
-	}
-	w.logger.WarnContext(ctx, "delivery failed",
-		"event_id", attempt.EventID,
-		"attempt_id", attempt.AttemptID,
-		"claim_count", attempt.ClaimCount,
-		"error_code", code,
-		"response_status", status,
-	)
-	return nil
-}
-
-func transportFailure(err error) (string, string) {
-	if errors.Is(err, context.DeadlineExceeded) {
-		return "timeout", "outbound request timed out"
-	}
-	return "request_error", "outbound request failed"
 }

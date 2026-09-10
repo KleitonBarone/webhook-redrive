@@ -20,20 +20,20 @@ This roadmap favors a small, explainable delivery system before distributed infr
 
 ## 2. Failure handling
 
-Milestone 1 records failures as terminal. Milestone 2 starts with the classification rules that decide whether a later attempt is allowed.
+Implemented with durable retry scheduling, bounded budgets, audited replay, and PostgreSQL-backed endpoint limits. The demo proves recovery after two failures and replay after exhaustion.
 
-- [ ] Classify retryable and terminal responses
-- [ ] Add exponential backoff with jitter
-- [ ] Enforce maximum attempts and dead-letter state
-- [ ] Support audited manual replay
-- [ ] Add per-endpoint concurrency and rate limits
+- [x] Classify retryable and terminal responses
+- [x] Add exponential backoff with jitter
+- [x] Enforce maximum attempts and dead-letter state
+- [x] Support audited manual replay
+- [x] Add per-endpoint concurrency and rate limits
 
 ## 3. Operability
 
 - [ ] Add traces across ingestion, queueing, and delivery
 - [ ] Publish queue depth, success rate, latency, and retry metrics
 - [x] Add structured logs with payload redaction
-- [ ] Provide a failure simulator for timeouts, `429`, and `500` responses
+- [x] Provide a failure simulator for timeouts, `429`, and `500` responses
 - [ ] Publish reproducible load-test results
 
 ## Later, if justified

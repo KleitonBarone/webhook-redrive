@@ -14,7 +14,7 @@ test:
 
 test-integration:
 	test -n "$$TEST_DATABASE_URL"
-	go test -race -count=1 ./internal/store
+	go test -race -count=1 ./internal/store ./internal/integration
 
 check: format-check vet test
 

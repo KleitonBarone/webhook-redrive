@@ -1,140 +1,118 @@
 # Webhook Redrive
 
-Webhook Redrive is a working, small webhook delivery service built around the failure cases that make outbound HTTP difficult to operate. It stores delivery intent before dispatch, signs the exact transmitted bytes, recovers work after worker crashes, and keeps enough attempt history to explain an outcome.
+Webhook Redrive accepts events, signs outbound requests, and keeps delivery history in PostgreSQL. It retries temporary failures, retains exhausted deliveries, and supports audited manual replay. One HTTP service and one worker process share one durable database.
 
-Milestones 0 and 1 are complete. The current release performs one delivery attempt per event. It does not retry failed requests yet.
-
-## Guarantees and limits
-
-- Delivery is at least once. Receivers must tolerate duplicate `X-Webhook-ID` values.
-- Event ingestion and first-attempt creation commit in one PostgreSQL transaction.
-- A worker persists its claim before sending and another worker can reclaim an expired lease.
-- Endpoint secrets are encrypted at rest with AES-256-GCM.
-- HMAC-SHA256 covers the timestamp and the exact body bytes sent over HTTP.
-- Outbound requests have a total timeout. The local default is two seconds.
-- Logs include IDs, states, status codes, and safe error codes. A redacting handler removes payloads and credentials if code attaches them by mistake.
-- A non-2xx response, timeout, or transport error is terminal for milestone 1. There are no automatic retries, dead letters, or replays yet.
-- The API has no authentication in this milestone. Do not expose it to the internet.
-
-Read [the delivery contract](docs/delivery-contract.md) for the state machine, crash window, and signature format. [The foundation decision](docs/decisions/0001-foundation.md) records the runtime, database, and repository layout.
+Milestones 0 through 2 are implemented. The project is a local portfolio demo with no API authentication.
 
 ## Run the demo
 
-Requirements: Docker with Compose.
-
-Start PostgreSQL, the API, one worker, and the synthetic receiver:
+Requires Docker Compose and PowerShell 7 for the verification script.
 
 ```console
-docker compose up --build -d
+docker compose up --build -d --wait
+pwsh -File scripts/demo.ps1
 ```
 
-The API listens on `localhost:8080`. The receiver listens on `localhost:9090`. Its `/success`, `/fail`, and `/timeout` routes provide deterministic delivery outcomes.
+The script verifies two scenarios:
 
-The following PowerShell flow registers a successful receiver and ingests an event:
+- A receiver returns HTTP 500 twice, then HTTP 204. History contains three attempts.
+- A receiver fails three times and the event becomes `dead_letter`. A manual replay succeeds. Submitting the replay request twice creates one attempt, with an actor and reason in history.
 
-```powershell
-$secret = "local-demo-secret-32-bytes-long"
-$endpoint = Invoke-RestMethod `
-  -Method Post `
-  -Uri http://localhost:8080/v1/endpoints `
-  -ContentType application/json `
-  -Body (@{ url = "http://receiver:9090/success"; secret = $secret } | ConvertTo-Json)
+All seven deliveries must carry valid signatures and identical body bytes. The script exits with an error if any assertion fails. PostgreSQL, API, and receiver ports bind to loopback only. Stop the stack with `docker compose down`; the database volume remains.
 
-$event = Invoke-RestMethod `
-  -Method Post `
-  -Uri "http://localhost:8080/v1/endpoints/$($endpoint.id)/events" `
-  -ContentType application/json `
-  -Headers @{ "X-Event-Type" = "order.created" } `
-  -Body '{"order_id":"demo-42","amount":1250}'
-
-Start-Sleep -Seconds 1
-Invoke-RestMethod "http://localhost:8080/v1/events/$($event.id)"
-Invoke-RestMethod "http://localhost:8080/v1/events/$($event.id)/attempts"
-Invoke-RestMethod http://localhost:9090/deliveries
-```
-
-The event state becomes `succeeded`. Attempt history shows HTTP `204` and `claim_count: 1`. The receiver reports `signature_valid: true` and a SHA-256 digest instead of echoing the payload.
-
-To demonstrate a terminal failure, register `http://receiver:9090/fail` with the same secret and ingest another event. Its state becomes `failed`, with `error_code: "http_status"` and response status `500`. Use `/timeout` to show the two-second outbound limit. The receiver waits three seconds, and attempt history records `error_code: "timeout"`.
-
-Stop the demo without deleting its PostgreSQL volume:
-
-```console
-docker compose down
-```
+The synthetic receiver supports `/success`, `/reject` for HTTP 400, `/fail` for HTTP 500, `/rate-limit` for HTTP 429 with a one-second `Retry-After`, `/timeout`, and `/flaky?failures=2`. Flaky counts are per event ID and reset when the receiver restarts. `GET http://localhost:9090/deliveries` reports signatures, status codes, and body hashes without returning payloads.
 
 ## API
 
-### Register an endpoint
+Register a receiver, including its delivery budget and limits:
 
-`POST /v1/endpoints`
+```powershell
+$endpoint = Invoke-RestMethod -Method Post -Uri http://localhost:8080/v1/endpoints -ContentType application/json -Body (@{
+    url = "http://receiver:9090/flaky?failures=2"
+    secret = "local-demo-secret-32-bytes-long"
+    max_attempts = 5
+    concurrency_limit = 2
+    rate_limit = 10
+} | ConvertTo-Json)
 
-```json
-{
-  "url": "http://receiver:9090/success",
-  "secret": "local-demo-secret-32-bytes-long"
-}
+$event = Invoke-RestMethod -Method Post -Uri "http://localhost:8080/v1/endpoints/$($endpoint.id)/events" -ContentType application/json -Headers @{
+    "X-Event-Type" = "order.created"
+} -Body '{"order_id":"demo-42","amount":1250}'
 ```
 
-The secret must contain at least 16 bytes. The response never returns it. URLs must be absolute HTTP or HTTPS URLs and cannot contain user information.
+Registration returns HTTP 201 and never returns the secret. Secrets must contain at least 16 bytes. Ingestion accepts valid JSON up to 1 MiB and returns HTTP 202 after the event and initial attempt commit together. Each ingestion request creates a new event; ingestion does not deduplicate caller requests.
 
-### Ingest an event
+Endpoint settings are optional and fixed at registration:
 
-`POST /v1/endpoints/{endpoint_id}/events`
+| Setting | Default | Range | Meaning |
+| --- | --- | --- | --- |
+| `max_attempts` | 5 | 1..20 | Logical attempts per delivery cycle, including the first |
+| `concurrency_limit` | 2 | 1..100 | Unexpired claims across all workers |
+| `rate_limit` | 10 | 1..1000 | Claims per one-second fixed window across all workers |
 
-Set `X-Event-Type` and send a JSON body of at most 1 MiB. The service stores the raw body bytes and returns `202 Accepted` after the event and pending attempt commit.
+Inspect delivery progress:
 
-### Inspect state
+```powershell
+Invoke-RestMethod "http://localhost:8080/v1/events/$($event.id)"
+Invoke-RestMethod "http://localhost:8080/v1/events/$($event.id)/attempts"
+Invoke-RestMethod "http://localhost:8080/v1/dead-letters"
+```
 
-- `GET /v1/events/{event_id}` returns the current delivery state.
-- `GET /v1/events/{event_id}/attempts` returns the attempt history, including claim count and safe failure details.
-- `GET /healthz` reports API process health.
+History exposes attempt number, cycle attempt, scheduled time, claim count, retry classification, response status, and replay audit fields. Event state follows the latest attempt. The dead-letter list returns at most 100 events; pass its `next_after` value as `?after=...` for the next page.
+
+To replay a failed or exhausted event:
+
+```powershell
+$history = (Invoke-RestMethod "http://localhost:8080/v1/events/$($event.id)/attempts").attempts
+$replay = @{
+    attempt_id = $history[-1].id
+    request_id = [guid]::NewGuid().ToString()
+    actor = "local-operator"
+    reason = "Receiver repaired"
+} | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri "http://localhost:8080/v1/events/$($event.id)/replays" -ContentType application/json -Body $replay
+```
+
+Replay requires the current `failed` or `dead_letter` attempt. It preserves the event ID, payload, and old history, and starts a new retry cycle. Repeat the same request body after an ambiguous API response; it returns the original replay attempt. Conflicting inputs or a stale attempt ID return HTTP 409. The actor is caller-supplied, not authenticated.
+
+## Delivery contract
+
+Delivery is at least once. A receiver can process an event before a worker crashes, causing a duplicate after lease recovery. Consumers must deduplicate using `X-Webhook-ID`. Successful processing is not guaranteed when a receiver keeps failing: retries stop at the configured budget.
+
+HTTP 408, 429, 500, 502, 503, and 504 are retryable. Timeouts and transient network errors are retryable; permanent DNS and certificate failures are terminal. Redirects are not followed. A terminal failure stays `failed`; exhausting retryable failures produces `dead_letter`.
+
+Backoff doubles from a one-second ceiling to a one-minute ceiling. Equal jitter chooses between half and all of that ceiling. A longer valid `Retry-After` takes precedence, capped at 24 hours.
+
+Endpoint limits count leased work and claim starts, not remote processing. A crash after sending may leave remote work running after the local lease expires. Crash recovery reclaims the same logical attempt and can exceed the configured number of wire requests. Fixed rate windows allow bursts across a window boundary. Workers need synchronized clocks, and delivery order is not guaranteed.
+
+Secrets use AES-256-GCM at rest. HMAC-SHA256 covers the timestamp and exact transmitted body bytes. Application logs contain IDs and safe outcomes; payloads and credentials stay out of logs. PostgreSQL retains payloads unencrypted. Public demo credentials are only for local use.
+
+See [the full delivery contract](docs/delivery-contract.md), [foundation decisions](docs/decisions/0001-foundation.md), and [failure-handling decisions](docs/decisions/0002-failure-handling.md).
 
 ## Development
 
-Go 1.24 or newer is required. Start only the local dependency with one command:
+Go 1.24 or newer is required. Start the database with one command:
 
 ```console
-docker compose up -d postgres
+docker compose up -d postgres --wait
 ```
-
-Set the integration test connection string:
 
 ```powershell
 $env:TEST_DATABASE_URL = "postgres://webhook_redrive:local-only-password@localhost:5432/webhook_redrive?sslmode=disable"
-```
-
-Run every check used by CI:
-
-```console
 gofmt -w cmd internal migrations
 go vet ./...
 go test -race -count=1 ./...
 ```
 
-Without `TEST_DATABASE_URL`, PostgreSQL integration tests skip and unit tests still run. CI always provides PostgreSQL, so transaction, concurrent-claim, and crash-recovery tests cannot silently skip there.
+The race detector requires CGO and a C compiler. Tests create and drop uniquely named schemas; the test database role needs permission to create schemas. Existing demo tables are not truncated. Integration tests skip when the URL is absent locally and fail if it is absent in CI.
 
-The binaries require these settings:
+The API and worker require `DATABASE_URL` and `MASTER_KEY`, a base64-encoded 32-byte AES key. Compose supplies synthetic local values. Worker defaults are `OUTBOUND_TIMEOUT=2s`, `CLAIM_LEASE=10s`, `POLL_PERIOD=250ms`, and `BATCH_SIZE=10`. The lease must exceed the request timeout; batch size must be 1..1000. `API_ADDR` defaults to `:8080`.
 
-| Setting | Process | Purpose |
-| --- | --- | --- |
-| `DATABASE_URL` | API, worker | pgx PostgreSQL connection string |
-| `MASTER_KEY` | API, worker | Base64-encoded 32-byte AES key |
-| `API_ADDR` | API | Listen address, default `:8080` |
-| `OUTBOUND_TIMEOUT` | worker | Total request timeout, default `2s` |
-| `CLAIM_LEASE` | worker | Claim lease, default `10s` and longer than the request timeout |
-| `POLL_PERIOD` | worker | Empty-queue poll interval, default `250ms` |
-| `BATCH_SIZE` | worker | Attempts claimed per poll, default `10` |
-
-Compose contains public local-only credentials. Generate a separate master key for any non-local environment:
-
-```console
-openssl rand -base64 32
-```
+Both binaries apply embedded migrations at startup under an advisory lock. For an existing milestone 1 database, stop the API and worker, rebuild, and start both together. Migration 002 preserves event history and leaves existing failures terminal until replayed. Mixed versions are unsupported.
 
 ## Next milestone
 
-Milestone 2 will add explicit retryable versus terminal classification, exponential backoff with deterministic jitter, maximum attempts, dead-letter state, audited manual replay, and endpoint concurrency and rate limits. See [ROADMAP.md](ROADMAP.md).
+Milestone 3 adds traces, queue and outcome metrics, and reproducible load-test evidence. See [ROADMAP.md](ROADMAP.md).
 
 ## License
 

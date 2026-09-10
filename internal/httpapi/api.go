@@ -29,6 +29,8 @@ type dataStore interface {
 	CreateEvent(context.Context, store.Event, []byte, string) error
 	GetEvent(context.Context, string) (store.Event, error)
 	ListAttempts(context.Context, string) ([]store.Attempt, error)
+	Replay(context.Context, string, store.ReplayRequest, time.Time) (store.ReplayResult, error)
+	ListDeadLetters(context.Context, string) ([]store.Event, error)
 }
 
 type API struct {
@@ -46,6 +48,8 @@ func New(dataStore dataStore, box *secret.Box, serviceClock clock.Clock, logger 
 	mux.HandleFunc("POST /v1/endpoints/{endpointID}/events", api.createEvent)
 	mux.HandleFunc("GET /v1/events/{eventID}", api.getEvent)
 	mux.HandleFunc("GET /v1/events/{eventID}/attempts", api.listAttempts)
+	mux.HandleFunc("POST /v1/events/{eventID}/replays", api.replay)
+	mux.HandleFunc("GET /v1/dead-letters", api.deadLetters)
 	return api.logRequests(mux)
 }
 
@@ -54,10 +58,13 @@ func (a *API) health(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (a *API) createEndpoint(w http.ResponseWriter, request *http.Request) {
-	var input struct {
-		URL    string `json:"url"`
-		Secret string `json:"secret"`
-	}
+	input := struct {
+		URL              string `json:"url"`
+		Secret           string `json:"secret"`
+		MaxAttempts      int    `json:"max_attempts"`
+		ConcurrencyLimit int    `json:"concurrency_limit"`
+		RateLimit        int    `json:"rate_limit"`
+	}{MaxAttempts: 5, ConcurrencyLimit: 2, RateLimit: 10}
 	if err := decodeJSON(w, request, &input); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -68,6 +75,10 @@ func (a *API) createEndpoint(w http.ResponseWriter, request *http.Request) {
 	}
 	if len(input.Secret) < minSecretBytes {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("secret must be at least %d bytes", minSecretBytes))
+		return
+	}
+	if input.MaxAttempts < 1 || input.MaxAttempts > 20 || input.ConcurrencyLimit < 1 || input.ConcurrencyLimit > 100 || input.RateLimit < 1 || input.RateLimit > 1000 {
+		writeError(w, http.StatusBadRequest, "max_attempts must be 1..20, concurrency_limit 1..100, and rate_limit 1..1000")
 		return
 	}
 
@@ -81,7 +92,8 @@ func (a *API) createEndpoint(w http.ResponseWriter, request *http.Request) {
 		a.internalError(w, request, "generate endpoint id", err)
 		return
 	}
-	endpoint := store.Endpoint{ID: endpointID, URL: input.URL, CreatedAt: a.clock.Now()}
+	endpoint := store.Endpoint{ID: endpointID, URL: input.URL, CreatedAt: a.clock.Now(),
+		MaxAttempts: input.MaxAttempts, ConcurrencyLimit: input.ConcurrencyLimit, RateLimit: input.RateLimit}
 	if err := a.store.CreateEndpoint(request.Context(), endpoint, ciphertext); err != nil {
 		a.internalError(w, request, "create endpoint", err)
 		return
@@ -91,6 +103,9 @@ func (a *API) createEndpoint(w http.ResponseWriter, request *http.Request) {
 
 func (a *API) createEvent(w http.ResponseWriter, request *http.Request) {
 	endpointID := request.PathValue("endpointID")
+	if !validID(w, endpointID) {
+		return
+	}
 	eventType := strings.TrimSpace(request.Header.Get("X-Event-Type"))
 	if eventType == "" || len(eventType) > 100 {
 		writeError(w, http.StatusBadRequest, "X-Event-Type must contain 1 to 100 characters")
@@ -132,6 +147,9 @@ func (a *API) createEvent(w http.ResponseWriter, request *http.Request) {
 }
 
 func (a *API) getEvent(w http.ResponseWriter, request *http.Request) {
+	if !validID(w, request.PathValue("eventID")) {
+		return
+	}
 	event, err := a.store.GetEvent(request.Context(), request.PathValue("eventID"))
 	if errors.Is(err, store.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "event not found")
@@ -145,6 +163,9 @@ func (a *API) getEvent(w http.ResponseWriter, request *http.Request) {
 }
 
 func (a *API) listAttempts(w http.ResponseWriter, request *http.Request) {
+	if !validID(w, request.PathValue("eventID")) {
+		return
+	}
 	attempts, err := a.store.ListAttempts(request.Context(), request.PathValue("eventID"))
 	if errors.Is(err, store.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "event not found")
@@ -158,7 +179,7 @@ func (a *API) listAttempts(w http.ResponseWriter, request *http.Request) {
 }
 
 func (a *API) internalError(w http.ResponseWriter, request *http.Request, operation string, err error) {
-	a.logger.ErrorContext(request.Context(), operation, "error", err)
+	a.logger.ErrorContext(request.Context(), operation, "error_type", fmt.Sprintf("%T", err))
 	writeError(w, http.StatusInternalServerError, "internal server error")
 }
 
@@ -173,7 +194,7 @@ func (a *API) logRequests(next http.Handler) http.Handler {
 		next.ServeHTTP(response, request)
 		a.logger.InfoContext(request.Context(), "http request",
 			"method", request.Method,
-			"path", request.URL.Path,
+			"route", request.Pattern,
 			"status", response.status,
 			"duration_ms", time.Since(started).Milliseconds(),
 		)

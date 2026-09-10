@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -28,32 +27,33 @@ type fakeAttemptStore struct {
 	failures         int
 	failureCode      string
 	loseFirstSuccess bool
+	lastOutcome      store.Outcome
 }
 
-func (s *fakeAttemptStore) ClaimAvailable(context.Context, string, time.Time, time.Duration, int) ([]store.ClaimedDelivery, error) {
+func (s *fakeAttemptStore) ClaimAvailable(_ context.Context, _ string, now time.Time, lease time.Duration, _ int) ([]store.ClaimedDelivery, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.claims++
 	delivery := s.delivery
 	delivery.ClaimCount = s.claims
+	delivery.LeaseUntil = now.Add(lease)
+	delivery.CycleAttempt = 1
 	return []store.ClaimedDelivery{delivery}, nil
 }
 
-func (s *fakeAttemptStore) CompleteSuccess(context.Context, string, string, time.Time, int) (bool, error) {
+func (s *fakeAttemptStore) Complete(_ context.Context, _ store.ClaimedDelivery, _ string, _ time.Time, outcome store.Outcome) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.lastOutcome = outcome
+	if outcome.Code != "" {
+		s.failures++
+		s.failureCode = outcome.Code
+		return true, nil
+	}
 	s.successes++
 	if s.loseFirstSuccess && s.successes == 1 {
 		return false, nil
 	}
-	return true, nil
-}
-
-func (s *fakeAttemptStore) CompleteFailure(_ context.Context, _, _ string, _ time.Time, _ int, code, _ string) (bool, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.failures++
-	s.failureCode = code
 	return true, nil
 }
 
@@ -134,12 +134,16 @@ func TestOutboundRequestTimeoutIsRecorded(t *testing.T) {
 	if dataStore.failures != 1 || dataStore.failureCode != "timeout" {
 		t.Fatalf("failures=%d code=%q, want one timeout", dataStore.failures, dataStore.failureCode)
 	}
+	if dataStore.lastOutcome.RetryAt == nil || !dataStore.lastOutcome.RetryAt.Equal(time.Unix(100, 0).Add(500*time.Millisecond)) {
+		t.Fatalf("timeout must schedule a retry: %+v", dataStore.lastOutcome)
+	}
 }
 
 func newTestWorker(t *testing.T, dataStore attemptStore, box *secret.Box, serviceClock fixedClock, timeout time.Duration) *Worker {
 	t.Helper()
 	worker, err := NewWorker(dataStore, box, serviceClock, slog.New(slog.NewTextHandler(io.Discard, nil)), Config{
-		WorkerID: "worker-" + strconv.FormatInt(time.Now().UnixNano(), 10),
+		WorkerID: "test-worker",
+		Jitter:   func() float64 { return 0 },
 		Lease:    timeout + time.Second, BatchSize: 1, PollPeriod: time.Millisecond, RequestTimeout: timeout,
 	})
 	if err != nil {

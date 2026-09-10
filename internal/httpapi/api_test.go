@@ -26,6 +26,14 @@ type fakeStore struct {
 	attemptID        string
 }
 
+func (s *fakeStore) Replay(_ context.Context, eventID string, input store.ReplayRequest, _ time.Time) (store.ReplayResult, error) {
+	return store.ReplayResult{EventID: eventID, AttemptID: input.AttemptID, RequestID: input.RequestID}, nil
+}
+
+func (s *fakeStore) ListDeadLetters(context.Context, string) ([]store.Event, error) {
+	return []store.Event{}, nil
+}
+
 func (s *fakeStore) CreateEndpoint(_ context.Context, endpoint store.Endpoint, ciphertext []byte) error {
 	s.endpoint = endpoint
 	s.secretCiphertext = append([]byte(nil), ciphertext...)

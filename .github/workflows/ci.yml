@@ -39,3 +39,19 @@ jobs:
         run: go vet ./...
       - name: Run tests
         run: go test -race -count=1 ./...
+
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start local delivery stack
+        run: docker compose up --build -d --wait
+      - name: Verify retry and replay demo
+        shell: pwsh
+        run: ./scripts/demo.ps1
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Stop local delivery stack
+        if: always()
+        run: docker compose down

@@ -6,6 +6,21 @@ import (
 	"fmt"
 )
 
+func Valid(value string) bool {
+	if len(value) != 36 || value[8] != '-' || value[13] != '-' || value[18] != '-' || value[23] != '-' {
+		return false
+	}
+	for index, char := range value {
+		if index == 8 || index == 13 || index == 18 || index == 23 {
+			continue
+		}
+		if !((char >= '0' && char <= '9') || (char >= 'a' && char <= 'f')) {
+			return false
+		}
+	}
+	return true
+}
+
 // New returns a random RFC 4122 version 4 UUID without adding a UUID dependency.
 func New() (string, error) {
 	var value [16]byte

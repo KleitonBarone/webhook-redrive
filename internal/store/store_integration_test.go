@@ -2,12 +2,12 @@ package store
 
 import (
 	"context"
-	"os"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/KleitonBarone/webhook-redrive/internal/id"
+	"github.com/KleitonBarone/webhook-redrive/internal/testdb"
 )
 
 func TestAtomicEventAndAttemptPersistence(t *testing.T) {
@@ -141,19 +141,13 @@ func TestExpiredClaimIsRecoveredAfterWorkerCrash(t *testing.T) {
 
 func integrationStore(t *testing.T) *Store {
 	t.Helper()
-	databaseURL := os.Getenv("TEST_DATABASE_URL")
-	if databaseURL == "" {
-		t.Skip("TEST_DATABASE_URL is not set")
-	}
+	databaseURL := testdb.URL(t)
 	dataStore, err := Open(context.Background(), databaseURL)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(dataStore.Close)
 	if err := dataStore.Migrate(context.Background(), time.Unix(1, 0)); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := dataStore.pool.Exec(context.Background(), `TRUNCATE delivery_attempts, events, webhook_endpoints`); err != nil {
 		t.Fatal(err)
 	}
 	return dataStore
@@ -164,6 +158,7 @@ func insertTestEndpoint(t *testing.T, dataStore *Store) string {
 	endpointID := mustID(t)
 	if err := dataStore.CreateEndpoint(context.Background(), Endpoint{
 		ID: endpointID, URL: "http://receiver.test/success", CreatedAt: time.Unix(1, 0),
+		ConcurrencyLimit: 32, RateLimit: 100,
 	}, []byte("synthetic-ciphertext")); err != nil {
 		t.Fatal(err)
 	}

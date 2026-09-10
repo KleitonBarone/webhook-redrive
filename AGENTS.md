@@ -4,7 +4,7 @@
 
 Webhook Redrive is a reliable webhook delivery service. The hard parts are delivery state, retries, duplicate handling, signatures, and enough telemetry to explain every attempt.
 
-Read `README.md` and `ROADMAP.md` before changing scope. Milestones 0 and 1 are implemented. Never describe milestone 2 or later capabilities as implemented.
+Read `README.md` and `ROADMAP.md` before changing scope. Milestones 0 through 2 are implemented. Traces, metrics, and load-test results remain planned.
 
 ## Product rules
 
@@ -14,6 +14,8 @@ Read `README.md` and `ROADMAP.md` before changing scope. Milestones 0 and 1 are 
 - Sign the exact bytes sent over the wire. Test timestamp tolerance and signature verification.
 - Make replay safe and auditable. A replay creates a new attempt linked to the original event.
 - Keep event payloads and credentials out of logs by default.
+- Commit failed outcomes and scheduled retries atomically. Fence completion with worker ID, claim generation, and lease expiry.
+- Reserve endpoint limits in PostgreSQL so they hold across workers. Replay must preserve history and deduplicate repeated request IDs.
 
 ## Keep the first system small
 
@@ -31,7 +33,9 @@ go vet ./...
 go test -race -count=1 ./...
 ```
 
-PostgreSQL integration tests require `TEST_DATABASE_URL`. Start the local database with `docker compose up -d postgres`. CI always sets the test URL and runs the complete suite.
+PostgreSQL integration tests require `TEST_DATABASE_URL`. Start the local database with `docker compose up -d postgres --wait`. Tests create isolated schemas and must not truncate existing demo tables. CI requires the test URL and runs the complete suite.
+
+Run `pwsh -File scripts/demo.ps1` against the local Compose stack to verify retry recovery, dead-letter exhaustion, replay, signatures, and unchanged payload bytes. Read `docs/decisions/0002-failure-handling.md` before changing retry budgets, claim locking, or replay semantics.
 
 Prioritize tests for state transitions, retry timing, concurrent claims, crash recovery, signature verification, rate limits, and replay. Use a controllable clock and deterministic jitter in tests.
 

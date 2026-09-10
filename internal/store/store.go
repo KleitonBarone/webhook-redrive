@@ -14,15 +14,19 @@ import (
 )
 
 var ErrNotFound = errors.New("not found")
+var ErrConflict = errors.New("conflicting replay")
 
 type Store struct {
 	pool *pgxpool.Pool
 }
 
 type Endpoint struct {
-	ID        string    `json:"id"`
-	URL       string    `json:"url"`
-	CreatedAt time.Time `json:"created_at"`
+	MaxAttempts      int       `json:"max_attempts"`
+	ConcurrencyLimit int       `json:"concurrency_limit"`
+	RateLimit        int       `json:"rate_limit"`
+	ID               string    `json:"id"`
+	URL              string    `json:"url"`
+	CreatedAt        time.Time `json:"created_at"`
 }
 
 type Event struct {
@@ -34,20 +38,31 @@ type Event struct {
 }
 
 type Attempt struct {
-	ID             string     `json:"id"`
-	EventID        string     `json:"event_id"`
-	State          string     `json:"state"`
-	ClaimCount     int        `json:"claim_count"`
-	LastStartedAt  *time.Time `json:"last_started_at,omitempty"`
-	CompletedAt    *time.Time `json:"completed_at,omitempty"`
-	ResponseStatus *int       `json:"response_status,omitempty"`
-	ErrorCode      *string    `json:"error_code,omitempty"`
-	ErrorMessage   *string    `json:"error_message,omitempty"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	AttemptNumber   int        `json:"attempt_number"`
+	CycleAttempt    int        `json:"cycle_attempt"`
+	MaxAttempts     int        `json:"max_attempts"`
+	AvailableAt     time.Time  `json:"available_at"`
+	Retryable       *bool      `json:"retryable,omitempty"`
+	ReplayOf        *string    `json:"replay_of,omitempty"`
+	ReplayRequestID *string    `json:"replay_request_id,omitempty"`
+	ReplayActor     *string    `json:"replay_actor,omitempty"`
+	ReplayReason    *string    `json:"replay_reason,omitempty"`
+	ID              string     `json:"id"`
+	EventID         string     `json:"event_id"`
+	State           string     `json:"state"`
+	ClaimCount      int        `json:"claim_count"`
+	LastStartedAt   *time.Time `json:"last_started_at,omitempty"`
+	CompletedAt     *time.Time `json:"completed_at,omitempty"`
+	ResponseStatus  *int       `json:"response_status,omitempty"`
+	ErrorCode       *string    `json:"error_code,omitempty"`
+	ErrorMessage    *string    `json:"error_message,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
 }
 
 type ClaimedDelivery struct {
+	CycleAttempt     int
+	LeaseUntil       time.Time
 	AttemptID        string
 	EventID          string
 	EventType        string
@@ -73,14 +88,6 @@ func Open(ctx context.Context, databaseURL string) (*Store, error) {
 func (s *Store) Close() { s.pool.Close() }
 
 func (s *Store) Migrate(ctx context.Context, now time.Time) error {
-	if _, err := s.pool.Exec(ctx, `
-		CREATE TABLE IF NOT EXISTS schema_migrations (
-			version text PRIMARY KEY,
-			applied_at timestamptz NOT NULL
-		)`); err != nil {
-		return fmt.Errorf("create migration ledger: %w", err)
-	}
-
 	entries, err := fs.ReadDir(migrations.Files, ".")
 	if err != nil {
 		return fmt.Errorf("read migrations: %w", err)
@@ -111,6 +118,10 @@ func (s *Store) applyMigration(ctx context.Context, version, sql string, now tim
 		return fmt.Errorf("lock migrations: %w", err)
 	}
 
+	if _, err := tx.Exec(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (version text PRIMARY KEY, applied_at timestamptz NOT NULL)`); err != nil {
+		return fmt.Errorf("create migration ledger: %w", err)
+	}
+
 	var applied bool
 	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM schema_migrations WHERE version = $1)`, version).Scan(&applied); err != nil {
 		return fmt.Errorf("check migration %s: %w", version, err)
@@ -131,9 +142,20 @@ func (s *Store) applyMigration(ctx context.Context, version, sql string, now tim
 }
 
 func (s *Store) CreateEndpoint(ctx context.Context, endpoint Endpoint, secretCiphertext []byte) error {
+	if endpoint.MaxAttempts == 0 {
+		endpoint.MaxAttempts = 5
+	}
+	if endpoint.ConcurrencyLimit == 0 {
+		endpoint.ConcurrencyLimit = 2
+	}
+	if endpoint.RateLimit == 0 {
+		endpoint.RateLimit = 10
+	}
 	_, err := s.pool.Exec(ctx, `
-		INSERT INTO webhook_endpoints (id, url, secret_ciphertext, created_at)
-		VALUES ($1, $2, $3, $4)`, endpoint.ID, endpoint.URL, secretCiphertext, endpoint.CreatedAt)
+		INSERT INTO webhook_endpoints (id, url, secret_ciphertext, created_at, max_attempts, concurrency_limit, rate_limit)
+		VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+		endpoint.ID, endpoint.URL, secretCiphertext, endpoint.CreatedAt,
+		endpoint.MaxAttempts, endpoint.ConcurrencyLimit, endpoint.RateLimit)
 	if err != nil {
 		return fmt.Errorf("insert endpoint: %w", err)
 	}
@@ -155,8 +177,8 @@ func (s *Store) CreateEvent(ctx context.Context, event Event, payload []byte, at
 	}
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO delivery_attempts (
-			id, event_id, state, available_at, created_at, updated_at
-		) VALUES ($1, $2, 'pending', $3, $3, $3)`, attemptID, event.ID, event.CreatedAt); err != nil {
+			id, event_id, state, available_at, created_at, updated_at, endpoint_id, max_attempts
+		) SELECT $1, $2, 'pending', $3, $3, $3, id, max_attempts FROM webhook_endpoints WHERE id=$4`, attemptID, event.ID, event.CreatedAt, event.EndpointID); err != nil {
 		return fmt.Errorf("insert delivery attempt: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -175,103 +197,13 @@ func (s *Store) EndpointExists(ctx context.Context, endpointID string) (bool, er
 	return exists, nil
 }
 
-// ClaimAvailable locks candidates only for the duration of this statement.
-// SKIP LOCKED lets concurrent workers claim disjoint attempts. Expired leases
-// are eligible again, which is the crash-recovery mechanism.
-func (s *Store) ClaimAvailable(ctx context.Context, workerID string, now time.Time, lease time.Duration, limit int) ([]ClaimedDelivery, error) {
-	rows, err := s.pool.Query(ctx, `
-		WITH candidates AS (
-			SELECT id
-			FROM delivery_attempts
-			WHERE available_at <= $1
-			  AND (
-				state = 'pending'
-				OR (state = 'in_progress' AND lease_until <= $1)
-			  )
-			ORDER BY created_at, id
-			FOR UPDATE SKIP LOCKED
-			LIMIT $2
-		), claimed AS (
-			UPDATE delivery_attempts AS attempt
-			SET state = 'in_progress',
-				lease_until = $1 + ($3 * INTERVAL '1 microsecond'),
-				claimed_by = $4,
-				claim_count = claim_count + 1,
-				last_started_at = $1,
-				updated_at = $1
-			FROM candidates
-			WHERE attempt.id = candidates.id
-			RETURNING attempt.id, attempt.event_id, attempt.claim_count
-		)
-		SELECT claimed.id, event.id, event.event_type, event.payload,
-		       endpoint.id, endpoint.url, endpoint.secret_ciphertext,
-		       claimed.claim_count
-		FROM claimed
-		JOIN events AS event ON event.id = claimed.event_id
-		JOIN webhook_endpoints AS endpoint ON endpoint.id = event.endpoint_id
-		ORDER BY event.created_at, claimed.id`, now, limit, lease.Microseconds(), workerID)
-	if err != nil {
-		return nil, fmt.Errorf("claim attempts: %w", err)
-	}
-	defer rows.Close()
-
-	claimed := make([]ClaimedDelivery, 0, limit)
-	for rows.Next() {
-		var delivery ClaimedDelivery
-		if err := rows.Scan(
-			&delivery.AttemptID,
-			&delivery.EventID,
-			&delivery.EventType,
-			&delivery.Payload,
-			&delivery.EndpointID,
-			&delivery.EndpointURL,
-			&delivery.SecretCiphertext,
-			&delivery.ClaimCount,
-		); err != nil {
-			return nil, fmt.Errorf("scan claimed attempt: %w", err)
-		}
-		claimed = append(claimed, delivery)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("read claimed attempts: %w", err)
-	}
-	return claimed, nil
-}
-
-func (s *Store) CompleteSuccess(ctx context.Context, attemptID, workerID string, now time.Time, responseStatus int) (bool, error) {
-	return s.complete(ctx, attemptID, workerID, now, "succeeded", responseStatus, "", "")
-}
-
-func (s *Store) CompleteFailure(ctx context.Context, attemptID, workerID string, now time.Time, responseStatus int, code, message string) (bool, error) {
-	return s.complete(ctx, attemptID, workerID, now, "failed", responseStatus, code, message)
-}
-
-func (s *Store) complete(ctx context.Context, attemptID, workerID string, now time.Time, state string, responseStatus int, code, message string) (bool, error) {
-	command, err := s.pool.Exec(ctx, `
-		UPDATE delivery_attempts
-		SET state = $1,
-			completed_at = $2,
-			response_status = NULLIF($3, 0),
-			error_code = NULLIF($4, ''),
-			error_message = NULLIF($5, ''),
-			lease_until = NULL,
-			updated_at = $2
-		WHERE id = $6
-		  AND state = 'in_progress'
-		  AND claimed_by = $7`, state, now, responseStatus, code, message, attemptID, workerID)
-	if err != nil {
-		return false, fmt.Errorf("complete attempt: %w", err)
-	}
-	return command.RowsAffected() == 1, nil
-}
-
 func (s *Store) GetEvent(ctx context.Context, eventID string) (Event, error) {
 	var event Event
 	err := s.pool.QueryRow(ctx, `
 		SELECT event.id, event.endpoint_id, event.event_type, attempt.state, event.created_at
 		FROM events AS event
 		JOIN delivery_attempts AS attempt ON attempt.event_id = event.id
-		WHERE event.id = $1`, eventID).Scan(
+		WHERE event.id = $1 ORDER BY attempt.attempt_number DESC LIMIT 1`, eventID).Scan(
 		&event.ID, &event.EndpointID, &event.EventType, &event.State, &event.CreatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -286,10 +218,12 @@ func (s *Store) GetEvent(ctx context.Context, eventID string) (Event, error) {
 func (s *Store) ListAttempts(ctx context.Context, eventID string) ([]Attempt, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT id, event_id, state, claim_count, last_started_at, completed_at,
-		       response_status, error_code, error_message, created_at, updated_at
+		       response_status, error_code, error_message, created_at, updated_at,
+		       attempt_number, cycle_attempt, max_attempts, available_at, retryable,
+		       replay_of, replay_request_id, replay_actor, replay_reason
 		FROM delivery_attempts
 		WHERE event_id = $1
-		ORDER BY created_at, id`, eventID)
+		ORDER BY attempt_number`, eventID)
 	if err != nil {
 		return nil, fmt.Errorf("list attempts: %w", err)
 	}
@@ -310,6 +244,15 @@ func (s *Store) ListAttempts(ctx context.Context, eventID string) ([]Attempt, er
 			&attempt.ErrorMessage,
 			&attempt.CreatedAt,
 			&attempt.UpdatedAt,
+			&attempt.AttemptNumber,
+			&attempt.CycleAttempt,
+			&attempt.MaxAttempts,
+			&attempt.AvailableAt,
+			&attempt.Retryable,
+			&attempt.ReplayOf,
+			&attempt.ReplayRequestID,
+			&attempt.ReplayActor,
+			&attempt.ReplayReason,
 		); err != nil {
 			return nil, fmt.Errorf("scan attempt: %w", err)
 		}

@@ -22,6 +22,7 @@ import (
 const maxReceiverBody = 1 << 20
 
 type receivedDelivery struct {
+	ResponseStatus int       `json:"response_status"`
 	EventID        string    `json:"event_id"`
 	EventType      string    `json:"event_type"`
 	BodySHA256     string    `json:"body_sha256"`
@@ -30,13 +31,14 @@ type receivedDelivery struct {
 }
 
 type receiver struct {
-	mu         sync.Mutex
-	deliveries []receivedDelivery
-	secret     []byte
-	tolerance  time.Duration
-	delay      time.Duration
-	clock      clock.Clock
-	logger     *slog.Logger
+	mu          sync.Mutex
+	deliveries  []receivedDelivery
+	secret      []byte
+	tolerance   time.Duration
+	delay       time.Duration
+	clock       clock.Clock
+	logger      *slog.Logger
+	eventCounts map[string]int
 }
 
 func main() {
@@ -54,6 +56,9 @@ func main() {
 	mux.HandleFunc("POST /success", r.deliver(http.StatusNoContent, 0))
 	mux.HandleFunc("POST /fail", r.deliver(http.StatusInternalServerError, 0))
 	mux.HandleFunc("POST /timeout", r.deliver(http.StatusNoContent, r.delay))
+	mux.HandleFunc("POST /reject", r.deliver(http.StatusBadRequest, 0))
+	mux.HandleFunc("POST /rate-limit", r.deliver(http.StatusTooManyRequests, 0))
+	mux.HandleFunc("POST /flaky", r.deliver(http.StatusInternalServerError, 0))
 	mux.HandleFunc("GET /deliveries", r.list)
 	server := &http.Server{
 		Addr: config.String("RECEIVER_ADDR", ":9090"), Handler: mux,
@@ -69,6 +74,16 @@ func main() {
 
 func (r *receiver) deliver(status int, delay time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, request *http.Request) {
+		responseStatus := status
+		failures := 2
+		if request.URL.Path == "/flaky" && request.URL.Query().Has("failures") {
+			parsed, err := strconv.Atoi(request.URL.Query().Get("failures"))
+			if err != nil || parsed < 0 || parsed > 20 {
+				http.Error(w, "failures must be 0..20", http.StatusBadRequest)
+				return
+			}
+			failures = parsed
+		}
 		body, err := io.ReadAll(http.MaxBytesReader(w, request.Body, maxReceiverBody))
 		if err != nil {
 			http.Error(w, "invalid body", http.StatusBadRequest)
@@ -92,6 +107,19 @@ func (r *receiver) deliver(status int, delay time.Duration) http.HandlerFunc {
 			ReceivedAt:     now,
 		}
 		r.mu.Lock()
+		if r.eventCounts == nil {
+			r.eventCounts = make(map[string]int)
+		}
+		if verificationErr == nil {
+			key := request.URL.Path + "/" + delivery.EventID
+			r.eventCounts[key]++
+			if request.URL.Path == "/flaky" && r.eventCounts[key] > failures {
+				responseStatus = http.StatusNoContent
+			}
+		} else {
+			responseStatus = http.StatusUnauthorized
+		}
+		delivery.ResponseStatus = responseStatus
 		r.deliveries = append(r.deliveries, delivery)
 		count := len(r.deliveries)
 		r.mu.Unlock()
@@ -114,7 +142,10 @@ func (r *receiver) deliver(status int, delay time.Duration) http.HandlerFunc {
 			}
 		}
 		w.Header().Set("X-Synthetic-Delivery-Count", strconv.Itoa(count))
-		w.WriteHeader(status)
+		if responseStatus == http.StatusTooManyRequests {
+			w.Header().Set("Retry-After", "1")
+		}
+		w.WriteHeader(responseStatus)
 	}
 }
 
