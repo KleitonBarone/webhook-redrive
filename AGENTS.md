@@ -4,7 +4,7 @@
 
 Webhook Redrive is a reliable webhook delivery service. The hard parts are delivery state, retries, duplicate handling, signatures, and enough telemetry to explain every attempt.
 
-Read `README.md` and `ROADMAP.md` before changing scope. Milestones 0 through 2 and milestone 3 telemetry are implemented. Published load-test evidence remains in progress.
+Read `README.md` and `ROADMAP.md` before changing scope. Milestones 0 through 3 are implemented. Local load evidence is in `docs/benchmarks/README.md`; do not describe those finite workloads as production capacity.
 
 ## Product rules
 

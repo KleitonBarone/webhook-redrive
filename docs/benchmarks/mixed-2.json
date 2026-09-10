@@ -1,0 +1,46 @@
+{
+  "started_at": "2026-09-10T00:45:33.9088484Z",
+  "revision": "47f6ecaae0f4d61e3315bfa41b8cf10a5c54b1d4",
+  "runtime": "go1.26.5 windows/amd64",
+  "scenario": "mixed",
+  "events": 200,
+  "ingestion_concurrency": 10,
+  "payload_bytes": 256,
+  "ingestion_seconds": 0.2874482,
+  "drain_seconds": 9.5779131,
+  "total_seconds": 9.8653613,
+  "completed_events_per_second": 20.272952395570144,
+  "ingestion_ack_ms": {
+    "p50": 10.8852,
+    "p95": 31.781700000000004,
+    "p99": 51.668
+  },
+  "event_completion_ms": {
+    "p50": 4795.998,
+    "p95": 9693.315,
+    "p99": 9869.811
+  },
+  "states": {
+    "dead_letter": 10,
+    "failed": 10,
+    "succeeded": 180
+  },
+  "attempts": 250,
+  "verified_signed_unchanged_deliveries": 250,
+  "trace_samples": {
+    "reject": "b04f07359f439aa76f5c6cfd01d27c83",
+    "retry": "a1c4e96f32c50bb7d27b2b1e2d6104ef",
+    "success": "cb3a81cc91b71f3eb029abd809b465a9",
+    "timeout": "5ae8d47c018221ea9185cf84dcc23cfe"
+  },
+  "unfinished_after_ingestion": 190,
+  "max_of_three_scrape_ms": 28.105600000000003,
+  "committed_counter_deltas": {
+    "completed": 250,
+    "webhook_claim_recoveries_total": 0,
+    "webhook_claims_total": 250,
+    "webhook_events_accepted_total": 200,
+    "webhook_replays_total": 0,
+    "webhook_retries_scheduled_total": 50
+  }
+}

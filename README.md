@@ -2,9 +2,7 @@
 
 Webhook Redrive accepts events, signs outbound requests, and keeps delivery history in PostgreSQL. It retries temporary failures, retains exhausted deliveries, and supports audited manual replay. One HTTP service and one worker process share one durable database.
 
-Milestones 0 through 2 are implemented. The project is a local portfolio demo with no API authentication.
-
-Milestone 3 tracing, metrics, and local load checks are implemented; the measured results are being collected.
+Milestones 0 through 3 are implemented. The project is a local portfolio demo with no API authentication.
 
 ## Run the demo
 
@@ -23,6 +21,8 @@ The script verifies two scenarios:
 All seven deliveries must carry valid signatures and identical body bytes. The script exits with an error if any assertion fails. PostgreSQL, API, and receiver ports bind to loopback only. Stop the stack with `docker compose down`; the database volume remains.
 
 The demo also verifies trace propagation and `/metrics`. Follow trace IDs through ingestion, queueing, retries, and replay using `docker compose logs --no-log-prefix api worker`. [Telemetry instructions](docs/observability.md) explain the spans, metric definitions, and load checks.
+
+[Published local results](docs/benchmarks/README.md) cover 1,800 events and 2,550 verified deliveries across success, retry, and mixed-failure workloads. They include raw JSON, the tested revision, hardware, and measurement limits. They are not a production throughput claim.
 
 The synthetic receiver supports `/success`, `/reject` for HTTP 400, `/fail` for HTTP 500, `/rate-limit` for HTTP 429 with a one-second `Retry-After`, `/timeout`, and `/flaky?failures=2`. Flaky counts are per event ID and reset when the receiver restarts. `GET http://localhost:9090/deliveries` reports signatures, status codes, and body hashes without returning payloads.
 
@@ -114,9 +114,9 @@ The API and worker require `DATABASE_URL` and `MASTER_KEY`, a base64-encoded 32-
 
 Both binaries apply embedded migrations at startup under an advisory lock. To upgrade, stop the API and worker, rebuild, and start both together. Migration 002 preserves event history and leaves existing failures terminal until replayed. Migration 003 adds durable trace context; older attempts begin without an ingestion trace. Mixed versions are unsupported.
 
-## Next milestone
+## Next steps
 
-Milestone 3 adds traces, queue and outcome metrics, and reproducible load-test evidence. See [ROADMAP.md](ROADMAP.md).
+The planned milestones are complete. Retention, circuit breaking, quotas, and queue changes remain optional and need evidence. The first measured performance follow-up is worker polling and fairness under slow receivers. See [ROADMAP.md](ROADMAP.md).
 
 ## License
 

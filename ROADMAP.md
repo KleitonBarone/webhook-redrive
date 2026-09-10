@@ -30,11 +30,13 @@ Implemented with durable retry scheduling, bounded budgets, audited replay, and 
 
 ## 3. Operability
 
+Implemented with OpenTelemetry trace propagation through durable attempts, database-derived Prometheus metrics, and [reproducible local evidence](docs/benchmarks/README.md). Nine measured workloads verified 1,800 events and 2,550 signed deliveries. CI runs a smaller mixed workload and saves its report.
+
 - [x] Add traces across ingestion, queueing, and delivery
 - [x] Publish queue depth, success rate, latency, and retry metrics
 - [x] Add structured logs with payload redaction
 - [x] Provide a failure simulator for timeouts, `429`, and `500` responses
-- [ ] Publish reproducible load-test results
+- [x] Publish reproducible load-test results
 
 ## Later, if justified
 

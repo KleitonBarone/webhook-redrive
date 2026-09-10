@@ -1,0 +1,41 @@
+{
+  "started_at": "2026-09-10T00:45:13.1933246Z",
+  "revision": "47f6ecaae0f4d61e3315bfa41b8cf10a5c54b1d4",
+  "runtime": "go1.26.5 windows/amd64",
+  "scenario": "retry",
+  "events": 200,
+  "ingestion_concurrency": 10,
+  "payload_bytes": 256,
+  "ingestion_seconds": 0.1923951,
+  "drain_seconds": 9.757587599999999,
+  "total_seconds": 9.9499827,
+  "completed_events_per_second": 20.100537461235987,
+  "ingestion_ack_ms": {
+    "p50": 8.891100000000002,
+    "p95": 16.573,
+    "p99": 23.4882
+  },
+  "event_completion_ms": {
+    "p50": 7322.26,
+    "p95": 9468.641,
+    "p99": 9708.345
+  },
+  "states": {
+    "succeeded": 200
+  },
+  "attempts": 400,
+  "verified_signed_unchanged_deliveries": 400,
+  "trace_samples": {
+    "retry": "52e8051728417ad0398141bc516b4ff6"
+  },
+  "unfinished_after_ingestion": 200,
+  "max_of_three_scrape_ms": 18.0992,
+  "committed_counter_deltas": {
+    "completed": 400,
+    "webhook_claim_recoveries_total": 0,
+    "webhook_claims_total": 400,
+    "webhook_events_accepted_total": 200,
+    "webhook_replays_total": 0,
+    "webhook_retries_scheduled_total": 200
+  }
+}
