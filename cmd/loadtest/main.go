@@ -76,7 +76,7 @@ func main() {
 	flag.StringVar(&c.Scenario, "scenario", "success", "success, retry, mixed, or fairness")
 	flag.StringVar(&c.Output, "output", "", "optional JSON report path")
 	flag.StringVar(&c.Revision, "revision", "working-tree", "source revision label recorded in the report")
-	flag.IntVar(&c.Events, "events", 200, "finite number of events; mixed requires a multiple of 20")
+	flag.IntVar(&c.Events, "events", 200, "finite number of events; mixed needs multiples of 20, fairness of 10")
 	flag.IntVar(&c.Concurrency, "concurrency", 10, "concurrent ingestion clients")
 	flag.DurationVar(&c.Deadline, "deadline", 2*time.Minute, "whole workload deadline")
 	flag.Parse()

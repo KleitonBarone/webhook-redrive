@@ -24,6 +24,15 @@ func TestWorkloadMixAndLocalBoundary(t *testing.T) {
 	if err := validate(c); err != nil {
 		t.Fatal(err)
 	}
+	c.Scenario, c.Events = "fairness", 40
+	if err := validate(c); err != nil {
+		t.Fatal(err)
+	}
+	c.Events = 41
+	if validate(c) == nil {
+		t.Fatal("accepted incomplete fairness mix")
+	}
+	c.Events = 40
 	for _, target := range []string{"https://example.com", "http://example.com", "http://localhost:8080?secret=x", "http://user:pass@localhost:8080"} {
 		c.API = target
 		if validate(c) == nil {

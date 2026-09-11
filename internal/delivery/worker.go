@@ -90,14 +90,49 @@ func NewWorker(dataStore attemptStore, box *secret.Box, serviceClock clock.Clock
 func (w *Worker) Run(ctx context.Context) error {
 	ticker := time.NewTicker(w.pollPeriod)
 	defer ticker.Stop()
+	return w.run(ctx, ticker.C)
+}
+
+// run claims only work that can start immediately. Completions refill free
+// slots; ticks discover new work and retry a failed claim without a busy loop.
+func (w *Worker) run(ctx context.Context, ticks <-chan time.Time) error {
+	completed := make(chan error, w.batchSize)
+	var deliveries sync.WaitGroup
+	defer deliveries.Wait()
+	active := 0
+	refill, claimFailed := true, false
 	for {
-		if _, err := w.RunOnce(ctx); err != nil {
-			w.logger.ErrorContext(ctx, "worker poll failed", "error_type", fmt.Sprintf("%T", err))
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if refill && !claimFailed && active < w.batchSize {
+			refill = false
+			claimed, err := w.store.ClaimAvailable(ctx, w.workerID, w.clock.Now(), w.lease, w.batchSize-active)
+			if err != nil {
+				claimFailed = true
+				w.logger.ErrorContext(ctx, "worker poll failed", "error_type", fmt.Sprintf("%T", err))
+			} else {
+				for _, attempt := range claimed {
+					active++
+					deliveries.Add(1)
+					go func() {
+						defer deliveries.Done()
+						completed <- w.deliver(ctx, attempt)
+					}()
+				}
+			}
 		}
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-ticker.C:
+		case err := <-completed:
+			active--
+			refill = true
+			if err != nil {
+				w.logger.ErrorContext(ctx, "delivery incomplete", "error_type", fmt.Sprintf("%T", err))
+			}
+		case <-ticks:
+			refill, claimFailed = true, false
 		}
 	}
 }
