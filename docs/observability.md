@@ -80,6 +80,35 @@ go run ./cmd/loadtest -scenario fairness -events 40 -concurrency 10
 
 The runner permits only loopback API/history addresses and the local `receiver` hostname for the destination. It refuses redirects. Every measured event must reach the expected outcome; the receiver must show the expected number of signed, unchanged bodies with matching trace IDs. Metric deltas must agree with history. The default whole-run deadline is two minutes. Reports are written only after all assertions pass.
 
-Use `-output result.json` to save a report and `-revision <commit>` to label its source. This is closed-loop ingestion followed by polling until completion, not a constant-arrival-rate benchmark. Throughput includes drain and polling overhead. Event-completion percentiles come from stored timestamps, not polling observation times. Setup, signature verification of receiver history, and final metric verification are outside the timed workload. Three metric scrapes are measured separately. No CPU/RAM sampling or sustained-load claim is made.
+Use `-output result.json` to save a report and `-revision <commit>` to label its source. The default mode uses closed-loop ingestion followed by polling until completion, not constant-rate arrivals. Throughput includes drain and polling overhead. Event-completion percentiles come from stored timestamps, not polling observation times. Setup, signature verification of receiver history, and final metric verification are outside the timed workload. Three metric scrapes are measured separately. The default burst mode does not sample CPU/RAM or establish sustained capacity.
 
-CI runs small mixed and fairness workloads as correctness checks and saves their JSON artifacts. Performance numbers are evidence to inspect, not timing gates on shared runners.
+CI runs small mixed, fairness, and paced saturation workloads as correctness checks and saves their JSON artifacts. Performance numbers are evidence to inspect, not timing gates on shared runners.
+
+### Paced load and saturation
+
+`-rate 50` spaces ingestion job submissions at least 20 ms apart, with at most the configured number of HTTP clients. Actual request starts also depend on goroutine scheduling. Slow clients stretch the workload instead of producing a catch-up burst. No events are dropped. Compare the target rate with `events / ingestion_seconds`; this is paced, bounded-client load, not an independent open-loop arrival generator. `max_pacing_lag_ms` records the largest individual scheduling delay, not cumulative drift.
+
+`-sample-interval 1s` records queue states, oldest-ready age, committed completions, and scrape duration during ingestion and drain. Sampling adds database work. The older `max_of_three_scrape_ms` field still covers only the before/after-ingestion/final scrapes, not these periodic samples.
+
+`saturation` first queues 30 timeout events without pacing, spread across `-slow-endpoints`. Each timeout endpoint has `-slow-concurrency` permits. The tool confirms `min(10, endpoints * concurrency)` active claims before sending the remaining healthy events at the requested rate. Use the default ten-slot worker and an otherwise idle stack. The slow backlog is finite, not a permanent outage stream.
+
+The report's `timing_check` marks timing invalid when the client's wall clock and monotonic elapsed time differ by over 50 ms, a stored event duration is negative, or it exceeds the observed request-to-inspection interval by over 50 ms. Correctness evidence is retained even when timing is invalid. Passing this check does not prove remote clock synchronization or detect every clock anomaly.
+
+### Measure database cost locally
+
+On a Linux Docker Engine with PowerShell 7:
+
+```console
+pwsh -File scripts/measure-load.ps1 -Scenario success -Events 3000 -Rate 50
+pwsh -File scripts/measure-load.ps1 -Scenario saturation -Events 130 -Rate 10 -SlowEndpoints 5 -SlowConcurrency 2
+```
+
+On Windows with Docker Engine in WSL, append `-WSLDistro Ubuntu`. Keep a WSL terminal open during the run. Ports 5432, 8080, and 9090 must be free. The script creates a new Compose project and volume, runs the generator in Linux host-network mode, then stops its containers without deleting data. Native Linux runs use the invoking UID/GID for writable output. The default Compose stack is unchanged.
+
+The opt-in `compose.benchmark.yml` enables PostgreSQL statement statistics and I/O timing. The script saves `load.json` plus `database-and-resources.json` under a new directory in `artifacts/benchmark`. Source edits in implementation paths add `-dirty` to the revision label. Neither SQL text nor bind values enter saved evidence. Do not enable this configuration on a live database.
+
+Before/after SQL snapshots group statement calls, execution milliseconds, buffer activity, and WAL bytes. Subtract matching groups; absent groups start at zero. Reject comparisons if statistics reset or entries were evicted. Execution time is not CPU time and excludes planning unless separately tracked. The snapshot interval includes setup, ingestion, drain, history verification, and observation. Database cumulative counters can lag active backends. See PostgreSQL's [statement statistics](https://www.postgresql.org/docs/17/pgstatstatements.html) and [cumulative statistics](https://www.postgresql.org/docs/17/monitoring-stats.html) definitions.
+
+The `claim_endpoints` group's call count measures claim-selection queries, including empty polls. `claim_attempts` counts claim CTE executions, not individual leases. Their rows count claimed attempts. The `metrics` group covers grouped attempt queries, not the entire exporter. `other` includes ingestion, completion, history reads, and unmatched statements. `observer` isolates the statistics query itself.
+
+Container samples use `docker stats --no-stream`, followed by a five-second pause. Keep their actual timestamps; the effective interval includes command latency. CPU percentages can exceed 100% across cores, and sampled peaks can miss short spikes. Sampling excludes the load-generator container and is not an end-to-end CPU profile. [Published paced-load evidence](benchmarks/sustained/README.md) records the measured environment and remaining limits.

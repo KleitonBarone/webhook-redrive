@@ -24,6 +24,8 @@ The demo also verifies trace propagation and `/metrics`. Follow trace IDs throug
 
 [Published local results](docs/benchmarks/README.md) cover 1,800 events and 2,550 verified deliveries across success, retry, and mixed-failure workloads. They include raw JSON, the tested revision, hardware, and measurement limits. They are not a production throughput claim.
 
+The [paced-load and saturation follow-up](docs/benchmarks/sustained/README.md) measures database cost and healthy-delivery delay when slow endpoints occupy every worker slot. It includes a script for isolated local measurement.
+
 The synthetic receiver supports `/success`, `/reject` for HTTP 400, `/fail` for HTTP 500, `/rate-limit` for HTTP 429 with a one-second `Retry-After`, `/timeout`, and `/flaky?failures=2`. Flaky counts are per event ID and reset when the receiver restarts. `GET http://localhost:9090/deliveries` reports signatures, status codes, and body hashes without returning payloads.
 
 ## API
@@ -118,7 +120,7 @@ Both binaries apply embedded migrations at startup under an advisory lock. To up
 
 ## Next steps
 
-The planned milestones and the [worker scheduling experiment](docs/benchmarks/scheduling/README.md) are complete. Sustained-load database cost and saturation across multiple slow endpoints remain unmeasured. Retention, circuit breaking, quotas, and queue changes remain optional and need evidence. See [ROADMAP.md](ROADMAP.md).
+The planned milestones, [worker scheduling experiment](docs/benchmarks/scheduling/README.md), and [one-minute paced-load measurements](docs/benchmarks/sustained/README.md) are complete. Full-slot saturation still delays healthy deliveries. Decide whether bounded healthy-endpoint latency is a product requirement before adding a fairness policy. Longer runs, larger histories, and multi-worker scaling remain unmeasured. See [ROADMAP.md](ROADMAP.md).
 
 ## License
 

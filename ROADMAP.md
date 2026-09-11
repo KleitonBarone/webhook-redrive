@@ -47,7 +47,16 @@ Implemented with OpenTelemetry trace propagation through durable attempts, datab
 - [x] Test bounded claims, controlled polling, and cancellation
 - [x] Publish [local comparison evidence](docs/benchmarks/scheduling/README.md) and add the failure mix to CI
 
-This does not guarantee strict fairness when slow endpoints occupy all slots. Sustained database cost and multi-worker saturation remain unmeasured.
+This does not guarantee strict fairness when slow endpoints occupy all slots.
+
+### Measured follow-up: paced load and saturation
+
+- [x] Add bounded paced ingestion, periodic queue samples, and clock-consistency checks
+- [x] Capture SQL cost and container resources on fresh local stacks
+- [x] Compare spare slots, one saturated endpoint, and several saturated endpoints
+- [x] Publish [raw results and limits](docs/benchmarks/sustained/README.md) and verify the measurement path in CI
+
+The evidence covers one-minute success workloads and finite timeout backlogs with one worker. Longer runs, larger histories, and multi-worker scaling remain unmeasured. Healthy-endpoint latency under full-slot saturation remains a product decision, not a guarantee.
 
 ### Optional product work
 

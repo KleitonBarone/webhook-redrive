@@ -23,3 +23,5 @@ This removes a batch barrier, not all forms of starvation. A slow endpoint can s
 Claim queries now follow completions as well as ticks. Busy workers can issue more database transactions than the old batch loop. Idle polling cadence is unchanged. The finite local comparison does not measure sustained database cost, capacity, or multi-worker fairness. Those need separate evidence before adding scheduling policy or infrastructure.
 
 See the [scheduling experiment](../benchmarks/scheduling/README.md) for source revisions, raw measurements, and limitations.
+
+The [paced-load follow-up](../benchmarks/sustained/README.md) measures one-minute SQL cost and confirms healthy-delivery delay under full-slot saturation. It does not change this decision or add a fairness guarantee.

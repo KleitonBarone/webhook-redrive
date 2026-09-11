@@ -44,6 +44,8 @@ Run `pwsh -File scripts/demo.ps1` against the local Compose stack to verify retr
 
 Run `go run ./cmd/loadtest -scenario mixed -events 40` and `go run ./cmd/loadtest -scenario fairness -events 40` on an isolated idle local stack for the CI-sized workloads. Publish real JSON results with their revision and environment; do not turn shared-runner timing into performance assertions.
 
+Use `scripts/measure-load.ps1` for paced-load/database evidence. Its benchmark override and statement statistics belong only on fresh local projects. Preserve raw reports, exclude invalid timing, and check statistics reset/eviction before comparing deltas. The saturation workload assumes one ten-slot worker; it does not prove multi-worker fairness.
+
 Prioritize tests for state transitions, retry timing, concurrent claims, crash recovery, signature verification, rate limits, and replay. Use a controllable clock and deterministic jitter in tests.
 
 Use synthetic endpoints and credentials. Do not connect tests or demos to production systems.

@@ -4,6 +4,8 @@ Measured on 2026-09-10 UTC at source revision `47f6ecaae0f4d61e3315bfa41b8cf10a5
 
 The subsequent [worker scheduling comparison](scheduling/README.md) tests the polling and slow-batch limitation identified here. This page preserves the original milestone 3 measurements.
 
+The [paced-load and saturation follow-up](sustained/README.md) adds SQL cost, container samples, and explicit full-slot saturation cases.
+
 ## Environment
 
 - AMD Ryzen 7 5700X3D, 8 physical cores and 16 logical CPUs.

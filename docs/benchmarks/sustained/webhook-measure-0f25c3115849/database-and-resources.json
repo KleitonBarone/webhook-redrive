@@ -1,0 +1,682 @@
+{
+  "project": "webhook-measure-0f25c3115849",
+  "revision": "7ca4691a6345cd990d2f8a819e0949033f9e1ce2",
+  "before": {
+    "captured_at": "2026-09-11T17:25:42.954294-03:00",
+    "server_version": "17.11",
+    "statistics_reset": "2026-09-11T17:25:32.779951-03:00",
+    "statistics_deallocations": 0,
+    "database_bytes": 8009395,
+    "events": 0,
+    "attempts": 0,
+    "statements": {
+      "claim_endpoints": {
+        "rows": 0,
+        "calls": 18,
+        "read_ms": 0,
+        "write_ms": 0,
+        "wal_bytes": 0,
+        "buffer_hits": 24,
+        "buffer_reads": 0,
+        "execution_ms": 0.6672319999999999,
+        "temp_blocks_written": 0
+      },
+      "other": {
+        "rows": 15,
+        "calls": 32,
+        "read_ms": 1.9887800000000002,
+        "write_ms": 0.27586,
+        "wal_bytes": 360673,
+        "buffer_hits": 4978,
+        "buffer_reads": 105,
+        "execution_ms": 74.748479,
+        "temp_blocks_written": 0
+      },
+      "observer": {
+        "rows": 0,
+        "calls": 1,
+        "read_ms": 0.716602,
+        "write_ms": 0.222246,
+        "wal_bytes": 253709,
+        "buffer_hits": 3477,
+        "buffer_reads": 53,
+        "execution_ms": 25.102504,
+        "temp_blocks_written": 0
+      },
+      "transaction": {
+        "rows": 0,
+        "calls": 48,
+        "read_ms": 0,
+        "write_ms": 0,
+        "wal_bytes": 0,
+        "buffer_hits": 0,
+        "buffer_reads": 0,
+        "execution_ms": 0.037767,
+        "temp_blocks_written": 0
+      }
+    },
+    "database": {
+      "commits": 24,
+      "rollbacks": 3,
+      "deadlocks": 0,
+      "temp_bytes": 0,
+      "read_ms": 1.607,
+      "write_ms": 0.218,
+      "statistics_reset": null
+    }
+  },
+  "after": {
+    "captured_at": "2026-09-11T17:26:45.682913-03:00",
+    "server_version": "17.11",
+    "statistics_reset": "2026-09-11T17:25:32.779951-03:00",
+    "statistics_deallocations": 0,
+    "database_bytes": 8541875,
+    "events": 130,
+    "attempts": 160,
+    "statements": {
+      "claim_capacity": {
+        "rows": 103,
+        "calls": 103,
+        "read_ms": 0,
+        "write_ms": 0,
+        "wal_bytes": 0,
+        "buffer_hits": 523,
+        "buffer_reads": 0,
+        "execution_ms": 3.300092,
+        "temp_blocks_written": 0
+      },
+      "metrics": {
+        "rows": 499,
+        "calls": 225,
+        "read_ms": 0,
+        "write_ms": 0,
+        "wal_bytes": 0,
+        "buffer_hits": 1724,
+        "buffer_reads": 0,
+        "execution_ms": 18.619577,
+        "temp_blocks_written": 0
+      },
+      "claim_endpoints": {
+        "rows": 103,
+        "calls": 429,
+        "read_ms": 0,
+        "write_ms": 0,
+        "wal_bytes": 9430,
+        "buffer_hits": 5997,
+        "buffer_reads": 0,
+        "execution_ms": 42.589293999999995,
+        "temp_blocks_written": 0
+      },
+      "claim_rate": {
+        "rows": 103,
+        "calls": 103,
+        "read_ms": 0,
+        "write_ms": 0,
+        "wal_bytes": 7687,
+        "buffer_hits": 483,
+        "buffer_reads": 0,
+        "execution_ms": 4.145973999999998,
+        "temp_blocks_written": 0
+      },
+      "other": {
+        "rows": 11080,
+        "calls": 11142,
+        "read_ms": 1.9887800000000002,
+        "write_ms": 0.8514100000000001,
+        "wal_bytes": 640119,
+        "buffer_hits": 54288,
+        "buffer_reads": 105,
+        "execution_ms": 510.76812000000007,
+        "temp_blocks_written": 0
+      },
+      "observer": {
+        "rows": 1,
+        "calls": 2,
+        "read_ms": 0.716602,
+        "write_ms": 0.222246,
+        "wal_bytes": 253709,
+        "buffer_hits": 3481,
+        "buffer_reads": 53,
+        "execution_ms": 26.181098,
+        "temp_blocks_written": 0
+      },
+      "claim_attempts": {
+        "rows": 160,
+        "calls": 103,
+        "read_ms": 0,
+        "write_ms": 0.14960400000000001,
+        "wal_bytes": 114089,
+        "buffer_hits": 3531,
+        "buffer_reads": 0,
+        "execution_ms": 17.51667000000001,
+        "temp_blocks_written": 0
+      },
+      "transaction": {
+        "rows": 0,
+        "calls": 1525,
+        "read_ms": 0,
+        "write_ms": 0,
+        "wal_bytes": 0,
+        "buffer_hits": 0,
+        "buffer_reads": 0,
+        "execution_ms": 0.6630759999999999,
+        "temp_blocks_written": 0
+      }
+    },
+    "database": {
+      "commits": 11017,
+      "rollbacks": 3,
+      "deadlocks": 0,
+      "temp_bytes": 0,
+      "read_ms": 7.563,
+      "write_ms": 1.281,
+      "statistics_reset": null
+    }
+  },
+  "resources": [
+    {
+      "captured_at": "2026-09-11T20:25:43.9898286+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "7.53%",
+        "Container": "6ceadbe83b76fa0226e092ae58fd8aaf5c3c3353ca732fcd73fefd1114e98f18",
+        "ID": "6ceadbe83b76",
+        "MemPerc": "0.08%",
+        "MemUsage": "13.06MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-api-1",
+        "NetIO": "79.5kB / 117kB",
+        "PIDs": "21"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:25:43.9898286+00:00",
+      "container": {
+        "BlockIO": "0B / 53.9MB",
+        "CPUPerc": "6.66%",
+        "Container": "6f89e595fa77b104e141baedf2fa1e032d3fe910b102970b0c667f1df0f6471c",
+        "ID": "6f89e595fa77",
+        "MemPerc": "0.41%",
+        "MemUsage": "65.53MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-postgres-1",
+        "NetIO": "162kB / 99.5kB",
+        "PIDs": "19"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:25:43.9898286+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "0.26%",
+        "Container": "25472afbd06ec949433d8c94f0515017fb5df9c8735dc617b10edc06fe91fc0c",
+        "ID": "25472afbd06e",
+        "MemPerc": "0.03%",
+        "MemUsage": "4.047MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-receiver-1",
+        "NetIO": "21.2kB / 3.31kB",
+        "PIDs": "7"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:25:43.9898286+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "1.87%",
+        "Container": "d7b8b9b74f3639496f6ae755b53fd9d166b32240d92ef8b9d70f895e5572c8c5",
+        "ID": "d7b8b9b74f36",
+        "MemPerc": "0.04%",
+        "MemUsage": "6.656MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-worker-1",
+        "NetIO": "49.3kB / 68kB",
+        "PIDs": "12"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:25:51.2334340+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "0.92%",
+        "Container": "6ceadbe83b76fa0226e092ae58fd8aaf5c3c3353ca732fcd73fefd1114e98f18",
+        "ID": "6ceadbe83b76",
+        "MemPerc": "0.09%",
+        "MemUsage": "14.49MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-api-1",
+        "NetIO": "187kB / 282kB",
+        "PIDs": "21"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:25:51.2334340+00:00",
+      "container": {
+        "BlockIO": "0B / 55.6MB",
+        "CPUPerc": "2.38%",
+        "Container": "6f89e595fa77b104e141baedf2fa1e032d3fe910b102970b0c667f1df0f6471c",
+        "ID": "6f89e595fa77",
+        "MemPerc": "0.43%",
+        "MemUsage": "68.93MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-postgres-1",
+        "NetIO": "431kB / 311kB",
+        "PIDs": "20"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:25:51.2334340+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "0.37%",
+        "Container": "25472afbd06ec949433d8c94f0515017fb5df9c8735dc617b10edc06fe91fc0c",
+        "ID": "25472afbd06e",
+        "MemPerc": "0.04%",
+        "MemUsage": "5.652MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-receiver-1",
+        "NetIO": "90.9kB / 19.7kB",
+        "PIDs": "7"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:25:51.2334340+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "1.50%",
+        "Container": "d7b8b9b74f3639496f6ae755b53fd9d166b32240d92ef8b9d70f895e5572c8c5",
+        "ID": "d7b8b9b74f36",
+        "MemPerc": "0.05%",
+        "MemUsage": "8.406MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-worker-1",
+        "NetIO": "204kB / 267kB",
+        "PIDs": "12"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:25:58.3955687+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "9.03%",
+        "Container": "6ceadbe83b76fa0226e092ae58fd8aaf5c3c3353ca732fcd73fefd1114e98f18",
+        "ID": "6ceadbe83b76",
+        "MemPerc": "0.08%",
+        "MemUsage": "12.62MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-api-1",
+        "NetIO": "1.31MB / 1.37MB",
+        "PIDs": "21"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:25:58.3955687+00:00",
+      "container": {
+        "BlockIO": "0B / 56MB",
+        "CPUPerc": "6.41%",
+        "Container": "6f89e595fa77b104e141baedf2fa1e032d3fe910b102970b0c667f1df0f6471c",
+        "ID": "6f89e595fa77",
+        "MemPerc": "0.44%",
+        "MemUsage": "69.56MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-postgres-1",
+        "NetIO": "889kB / 1MB",
+        "PIDs": "20"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:25:58.3955687+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "0.00%",
+        "Container": "25472afbd06ec949433d8c94f0515017fb5df9c8735dc617b10edc06fe91fc0c",
+        "ID": "25472afbd06e",
+        "MemPerc": "0.03%",
+        "MemUsage": "4.906MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-receiver-1",
+        "NetIO": "110kB / 24.1kB",
+        "PIDs": "7"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:25:58.3955687+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "0.66%",
+        "Container": "d7b8b9b74f3639496f6ae755b53fd9d166b32240d92ef8b9d70f895e5572c8c5",
+        "ID": "d7b8b9b74f36",
+        "MemPerc": "0.05%",
+        "MemUsage": "8.637MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-worker-1",
+        "NetIO": "283kB / 372kB",
+        "PIDs": "12"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:26:05.5598524+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "6.40%",
+        "Container": "6ceadbe83b76fa0226e092ae58fd8aaf5c3c3353ca732fcd73fefd1114e98f18",
+        "ID": "6ceadbe83b76",
+        "MemPerc": "0.08%",
+        "MemUsage": "13.04MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-api-1",
+        "NetIO": "2.46MB / 2.5MB",
+        "PIDs": "21"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:26:05.5598524+00:00",
+      "container": {
+        "BlockIO": "0B / 56.4MB",
+        "CPUPerc": "6.49%",
+        "Container": "6f89e595fa77b104e141baedf2fa1e032d3fe910b102970b0c667f1df0f6471c",
+        "ID": "6f89e595fa77",
+        "MemPerc": "0.47%",
+        "MemUsage": "74.46MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-postgres-1",
+        "NetIO": "1.34MB / 1.65MB",
+        "PIDs": "20"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:26:05.5598524+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "0.08%",
+        "Container": "25472afbd06ec949433d8c94f0515017fb5df9c8735dc617b10edc06fe91fc0c",
+        "ID": "25472afbd06e",
+        "MemPerc": "0.03%",
+        "MemUsage": "5.305MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-receiver-1",
+        "NetIO": "118kB / 26.3kB",
+        "PIDs": "7"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:26:05.5598524+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "0.21%",
+        "Container": "d7b8b9b74f3639496f6ae755b53fd9d166b32240d92ef8b9d70f895e5572c8c5",
+        "ID": "d7b8b9b74f36",
+        "MemPerc": "0.05%",
+        "MemUsage": "8.41MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-worker-1",
+        "NetIO": "308kB / 408kB",
+        "PIDs": "12"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:26:12.7295234+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "8.18%",
+        "Container": "6ceadbe83b76fa0226e092ae58fd8aaf5c3c3353ca732fcd73fefd1114e98f18",
+        "ID": "6ceadbe83b76",
+        "MemPerc": "0.08%",
+        "MemUsage": "13.5MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-api-1",
+        "NetIO": "3.61MB / 3.62MB",
+        "PIDs": "21"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:26:12.7295234+00:00",
+      "container": {
+        "BlockIO": "0B / 56.5MB",
+        "CPUPerc": "3.63%",
+        "Container": "6f89e595fa77b104e141baedf2fa1e032d3fe910b102970b0c667f1df0f6471c",
+        "ID": "6f89e595fa77",
+        "MemPerc": "0.44%",
+        "MemUsage": "70.25MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-postgres-1",
+        "NetIO": "1.79MB / 2.3MB",
+        "PIDs": "20"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:26:12.7295234+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "0.08%",
+        "Container": "25472afbd06ec949433d8c94f0515017fb5df9c8735dc617b10edc06fe91fc0c",
+        "ID": "25472afbd06e",
+        "MemPerc": "0.03%",
+        "MemUsage": "4.121MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-receiver-1",
+        "NetIO": "124kB / 28kB",
+        "PIDs": "7"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:26:12.7295234+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "0.22%",
+        "Container": "d7b8b9b74f3639496f6ae755b53fd9d166b32240d92ef8b9d70f895e5572c8c5",
+        "ID": "d7b8b9b74f36",
+        "MemPerc": "0.06%",
+        "MemUsage": "9MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-worker-1",
+        "NetIO": "339kB / 452kB",
+        "PIDs": "12"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:26:19.8981009+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "5.34%",
+        "Container": "6ceadbe83b76fa0226e092ae58fd8aaf5c3c3353ca732fcd73fefd1114e98f18",
+        "ID": "6ceadbe83b76",
+        "MemPerc": "0.09%",
+        "MemUsage": "13.96MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-api-1",
+        "NetIO": "4.67MB / 4.66MB",
+        "PIDs": "21"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:26:19.8981009+00:00",
+      "container": {
+        "BlockIO": "0B / 57.2MB",
+        "CPUPerc": "5.82%",
+        "Container": "6f89e595fa77b104e141baedf2fa1e032d3fe910b102970b0c667f1df0f6471c",
+        "ID": "6f89e595fa77",
+        "MemPerc": "0.44%",
+        "MemUsage": "69.93MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-postgres-1",
+        "NetIO": "2.21MB / 2.9MB",
+        "PIDs": "20"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:26:19.8981009+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "0.08%",
+        "Container": "25472afbd06ec949433d8c94f0515017fb5df9c8735dc617b10edc06fe91fc0c",
+        "ID": "25472afbd06e",
+        "MemPerc": "0.03%",
+        "MemUsage": "4.711MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-receiver-1",
+        "NetIO": "133kB / 30.3kB",
+        "PIDs": "7"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:26:19.8981009+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "0.21%",
+        "Container": "d7b8b9b74f3639496f6ae755b53fd9d166b32240d92ef8b9d70f895e5572c8c5",
+        "ID": "d7b8b9b74f36",
+        "MemPerc": "0.06%",
+        "MemUsage": "9.414MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-worker-1",
+        "NetIO": "368kB / 492kB",
+        "PIDs": "12"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:26:27.0776964+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "7.25%",
+        "Container": "6ceadbe83b76fa0226e092ae58fd8aaf5c3c3353ca732fcd73fefd1114e98f18",
+        "ID": "6ceadbe83b76",
+        "MemPerc": "0.10%",
+        "MemUsage": "15.22MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-api-1",
+        "NetIO": "5.5MB / 5.48MB",
+        "PIDs": "21"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:26:27.0776964+00:00",
+      "container": {
+        "BlockIO": "0B / 57.9MB",
+        "CPUPerc": "2.54%",
+        "Container": "6f89e595fa77b104e141baedf2fa1e032d3fe910b102970b0c667f1df0f6471c",
+        "ID": "6f89e595fa77",
+        "MemPerc": "0.45%",
+        "MemUsage": "71.91MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-postgres-1",
+        "NetIO": "2.55MB / 3.39MB",
+        "PIDs": "20"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:26:27.0776964+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "0.09%",
+        "Container": "25472afbd06ec949433d8c94f0515017fb5df9c8735dc617b10edc06fe91fc0c",
+        "ID": "25472afbd06e",
+        "MemPerc": "0.03%",
+        "MemUsage": "4.797MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-receiver-1",
+        "NetIO": "141kB / 32.5kB",
+        "PIDs": "7"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:26:27.0776964+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "0.38%",
+        "Container": "d7b8b9b74f3639496f6ae755b53fd9d166b32240d92ef8b9d70f895e5572c8c5",
+        "ID": "d7b8b9b74f36",
+        "MemPerc": "0.06%",
+        "MemUsage": "8.957MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-worker-1",
+        "NetIO": "391kB / 523kB",
+        "PIDs": "12"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:26:34.2474955+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "2.36%",
+        "Container": "6ceadbe83b76fa0226e092ae58fd8aaf5c3c3353ca732fcd73fefd1114e98f18",
+        "ID": "6ceadbe83b76",
+        "MemPerc": "0.09%",
+        "MemUsage": "14MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-api-1",
+        "NetIO": "6.07MB / 6.04MB",
+        "PIDs": "21"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:26:34.2474955+00:00",
+      "container": {
+        "BlockIO": "0B / 58.1MB",
+        "CPUPerc": "4.38%",
+        "Container": "6f89e595fa77b104e141baedf2fa1e032d3fe910b102970b0c667f1df0f6471c",
+        "ID": "6f89e595fa77",
+        "MemPerc": "0.46%",
+        "MemUsage": "72.82MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-postgres-1",
+        "NetIO": "2.78MB / 3.72MB",
+        "PIDs": "20"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:26:34.2474955+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "0.00%",
+        "Container": "25472afbd06ec949433d8c94f0515017fb5df9c8735dc617b10edc06fe91fc0c",
+        "ID": "25472afbd06e",
+        "MemPerc": "0.03%",
+        "MemUsage": "4.824MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-receiver-1",
+        "NetIO": "147kB / 34.2kB",
+        "PIDs": "7"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:26:34.2474955+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "0.60%",
+        "Container": "d7b8b9b74f3639496f6ae755b53fd9d166b32240d92ef8b9d70f895e5572c8c5",
+        "ID": "d7b8b9b74f36",
+        "MemPerc": "0.05%",
+        "MemUsage": "8.555MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-worker-1",
+        "NetIO": "420kB / 562kB",
+        "PIDs": "12"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:26:41.4244773+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "3.28%",
+        "Container": "6ceadbe83b76fa0226e092ae58fd8aaf5c3c3353ca732fcd73fefd1114e98f18",
+        "ID": "6ceadbe83b76",
+        "MemPerc": "0.10%",
+        "MemUsage": "16.07MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-api-1",
+        "NetIO": "6.36MB / 6.33MB",
+        "PIDs": "21"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:26:41.4244773+00:00",
+      "container": {
+        "BlockIO": "0B / 58.2MB",
+        "CPUPerc": "1.05%",
+        "Container": "6f89e595fa77b104e141baedf2fa1e032d3fe910b102970b0c667f1df0f6471c",
+        "ID": "6f89e595fa77",
+        "MemPerc": "0.46%",
+        "MemUsage": "73MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-postgres-1",
+        "NetIO": "2.93MB / 3.91MB",
+        "PIDs": "20"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:26:41.4244773+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "0.08%",
+        "Container": "25472afbd06ec949433d8c94f0515017fb5df9c8735dc617b10edc06fe91fc0c",
+        "ID": "25472afbd06e",
+        "MemPerc": "0.04%",
+        "MemUsage": "5.645MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-receiver-1",
+        "NetIO": "155kB / 36.4kB",
+        "PIDs": "7"
+      }
+    },
+    {
+      "captured_at": "2026-09-11T20:26:41.4244773+00:00",
+      "container": {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "0.23%",
+        "Container": "d7b8b9b74f3639496f6ae755b53fd9d166b32240d92ef8b9d70f895e5572c8c5",
+        "ID": "d7b8b9b74f36",
+        "MemPerc": "0.05%",
+        "MemUsage": "8.566MiB / 15.58GiB",
+        "Name": "webhook-measure-0f25c3115849-worker-1",
+        "NetIO": "444kB / 595kB",
+        "PIDs": "12"
+      }
+    }
+  ]
+}
