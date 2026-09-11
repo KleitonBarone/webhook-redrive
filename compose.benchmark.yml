@@ -1,0 +1,16 @@
+# Opt-in local measurement only. Use a fresh Compose project and volume.
+services:
+  postgres:
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements", "-c", "track_io_timing=on"]
+    volumes:
+      - ./scripts/benchmark-stats.sql:/benchmark-stats.sql:ro
+  loadtest:
+    profiles: [benchmark]
+    build:
+      context: .
+      target: loadtest
+    # Linux host networking puts the generator on the services' kernel clock
+    # while preserving the existing loopback-only URL checks.
+    network_mode: host
+    volumes:
+      - ${BENCHMARK_OUTPUT_DIR:-./artifacts/benchmark}:/evidence

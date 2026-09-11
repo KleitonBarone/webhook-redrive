@@ -1,4 +1,4 @@
-// loadtest runs finite, closed-loop workloads against the local synthetic stack.
+// loadtest runs finite workloads against the local synthetic stack.
 // It is a development tool, not an additional service.
 package main
 
@@ -31,6 +31,8 @@ type config struct {
 	API, Receiver, History, Scenario, Output, Revision string
 	Events, Concurrency                                int
 	Deadline                                           time.Duration
+	Rate, SlowEndpoints, SlowConcurrency               int
+	SampleInterval                                     time.Duration
 }
 
 type percentiles struct {
@@ -60,12 +62,20 @@ type report struct {
 	QueueAfterIngestion float64                `json:"unfinished_after_ingestion"`
 	MaxScrapeMS         float64                `json:"max_of_three_scrape_ms"`
 	CountersDelta       map[string]float64     `json:"committed_counter_deltas"`
+	Rate                int                    `json:"target_ingestion_per_second"`
+	MaxPacingLagMS      float64                `json:"max_pacing_lag_ms"`
+	Samples             []queueSample          `json:"queue_samples,omitempty"`
+	Timing              timingCheck            `json:"timing_check"`
+	SlowEndpoints       int                    `json:"slow_endpoints,omitempty"`
+	SlowConcurrency     int                    `json:"slow_endpoint_concurrency,omitempty"`
+	PrimedInProgress    float64                `json:"primed_in_progress,omitempty"`
 }
 
 type eventResult struct {
 	event     store.Event
 	kind      string
 	ingestion time.Duration
+	started   time.Time
 }
 
 func main() {
@@ -73,12 +83,16 @@ func main() {
 	flag.StringVar(&c.API, "api", "http://localhost:8080", "local API URL")
 	flag.StringVar(&c.Receiver, "receiver", "http://receiver:9090", "synthetic receiver URL as seen by the worker")
 	flag.StringVar(&c.History, "history", "http://localhost:9090", "local receiver history URL")
-	flag.StringVar(&c.Scenario, "scenario", "success", "success, retry, mixed, or fairness")
+	flag.StringVar(&c.Scenario, "scenario", "success", "success, retry, mixed, fairness, or saturation")
 	flag.StringVar(&c.Output, "output", "", "optional JSON report path")
 	flag.StringVar(&c.Revision, "revision", "working-tree", "source revision label recorded in the report")
 	flag.IntVar(&c.Events, "events", 200, "finite number of events; mixed needs multiples of 20, fairness of 10")
 	flag.IntVar(&c.Concurrency, "concurrency", 10, "concurrent ingestion clients")
 	flag.DurationVar(&c.Deadline, "deadline", 2*time.Minute, "whole workload deadline")
+	flag.IntVar(&c.Rate, "rate", 0, "paced ingestion starts per second, 0 for an unpaced burst")
+	flag.IntVar(&c.SlowEndpoints, "slow-endpoints", 1, "timeout endpoints in saturation, 1..10")
+	flag.IntVar(&c.SlowConcurrency, "slow-concurrency", 10, "per-timeout-endpoint limit in saturation, 1..10")
+	flag.DurationVar(&c.SampleInterval, "sample-interval", 0, "queue sampling interval, 0 to disable or 1s..1m")
 	flag.Parse()
 	if err := validate(c); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -111,8 +125,17 @@ func validate(c config) error {
 	if c.Events < 1 || c.Events > 10000 || c.Concurrency < 1 || c.Concurrency > 64 || c.Deadline <= 0 || c.Deadline > 10*time.Minute {
 		return errors.New("events must be 1..10000, concurrency 1..64, deadline 0..10m")
 	}
-	if c.Scenario != "success" && c.Scenario != "retry" && c.Scenario != "mixed" && c.Scenario != "fairness" {
-		return errors.New("scenario must be success, retry, mixed, or fairness")
+	if c.Rate < 0 || c.Rate > 1000 || (c.Rate > 0 && time.Duration(c.Events)*time.Second/time.Duration(c.Rate) >= c.Deadline) {
+		return errors.New("rate must be 0..1000 and paced ingestion must fit within the deadline")
+	}
+	if c.SampleInterval != 0 && (c.SampleInterval < time.Second || c.SampleInterval > time.Minute) {
+		return errors.New("sample interval must be 0 or 1s..1m")
+	}
+	if c.Scenario != "success" && c.Scenario != "retry" && c.Scenario != "mixed" && c.Scenario != "fairness" && c.Scenario != "saturation" {
+		return errors.New("scenario must be success, retry, mixed, fairness, or saturation")
+	}
+	if c.Scenario == "saturation" && (c.Events < 40 || c.SlowEndpoints < 1 || c.SlowEndpoints > 10 || c.SlowConcurrency < 1 || c.SlowConcurrency > 10) {
+		return errors.New("saturation needs at least 40 events and slow endpoints/concurrency in 1..10")
 	}
 	if c.Scenario == "mixed" && c.Events%20 != 0 {
 		return errors.New("mixed events must be a multiple of 20")
@@ -137,6 +160,12 @@ func validate(c config) error {
 }
 
 func kindFor(scenario string, i int) string {
+	if scenario == "saturation" {
+		if i < 30 {
+			return "timeout"
+		}
+		return "success"
+	}
 	if scenario == "fairness" {
 		if i%10 == 0 {
 			return "timeout"
@@ -167,14 +196,14 @@ func run(c config) (report, error) {
 	client := &http.Client{Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	defer client.CloseIdleConnections()
 	r := report{StartedAt: time.Now().UTC(), Revision: c.Revision, Runtime: runtime.Version() + " " + runtime.GOOS + "/" + runtime.GOARCH,
-		Scenario: c.Scenario, Events: c.Events, Concurrency: c.Concurrency, States: map[string]int{}, TraceSamples: map[string]string{}, CountersDelta: map[string]float64{}, CompletionByKind: map[string]percentiles{}}
+		Scenario: c.Scenario, Events: c.Events, Concurrency: c.Concurrency, Rate: c.Rate, Timing: timingCheck{Valid: true}, States: map[string]int{}, TraceSamples: map[string]string{}, CountersDelta: map[string]float64{}, CompletionByKind: map[string]percentiles{}}
 	api, history := strings.TrimRight(c.API, "/"), strings.TrimRight(c.History, "/")
 	before, scrapeTime, err := metrics(ctx, client, api)
 	if err != nil {
 		return r, err
 	}
 	r.MaxScrapeMS = scrapeTime
-	endpoints := map[string]string{}
+	endpoints := map[string][]string{}
 	for _, kind := range []string{"success", "retry", "reject", "timeout"} {
 		needed := false
 		for i := 0; i < c.Events; i++ {
@@ -191,24 +220,30 @@ func run(c config) (report, error) {
 		if c.Scenario == "fairness" && kind == "timeout" {
 			concurrency = 2
 		}
-		body, _ := json.Marshal(map[string]any{"url": strings.TrimRight(c.Receiver, "/") + route, "secret": "local-demo-secret-32-bytes-long", "max_attempts": 2, "concurrency_limit": concurrency, "rate_limit": 1000})
-		var endpoint store.Endpoint
-		if err := call(ctx, client, "POST", api+"/v1/endpoints", body, 201, &endpoint); err != nil {
-			return r, err
+		count := 1
+		if c.Scenario == "saturation" && kind == "timeout" {
+			count, concurrency = c.SlowEndpoints, c.SlowConcurrency
+			r.SlowEndpoints, r.SlowConcurrency = count, concurrency
 		}
-		endpoints[kind] = endpoint.ID
+		body, _ := json.Marshal(map[string]any{"url": strings.TrimRight(c.Receiver, "/") + route, "secret": "local-demo-secret-32-bytes-long", "max_attempts": 2, "concurrency_limit": concurrency, "rate_limit": 1000})
+		for range count {
+			var endpoint store.Endpoint
+			if err := call(ctx, client, "POST", api+"/v1/endpoints", body, 201, &endpoint); err != nil {
+				return r, err
+			}
+			endpoints[kind] = append(endpoints[kind], endpoint.ID)
+		}
 	}
 	payload := []byte(`{"synthetic":"` + strings.Repeat("x", 240) + `"}`)
 	r.PayloadBytes = len(payload)
 	results := make([]eventResult, c.Events)
-	jobs := make(chan int, c.Events)
-	for i := 0; i < c.Events; i++ {
-		jobs <- i
-	}
-	close(jobs)
+	jobs := make(chan int)
 	var wg sync.WaitGroup
 	failures := make(chan error, c.Concurrency)
 	started := time.Now()
+	observed := startSampling(ctx, client, api, started, c.SampleInterval)
+	defer observed.stop()
+	primeDone := make(chan struct{}, 30)
 	for n := 0; n < c.Concurrency; n++ {
 		wg.Add(1)
 		go func() {
@@ -217,20 +252,61 @@ func run(c config) (report, error) {
 				kind := kindFor(c.Scenario, i)
 				begin := time.Now()
 				var event store.Event
-				if err := call(ctx, client, "POST", api+"/v1/endpoints/"+endpoints[kind]+"/events", payload, 202, &event); err != nil {
+				targets := endpoints[kind]
+				if err := call(ctx, client, "POST", api+"/v1/endpoints/"+targets[i%len(targets)]+"/events", payload, 202, &event); err != nil {
 					failures <- err
 					cancel()
 					return
 				}
-				results[i] = eventResult{event: event, kind: kind, ingestion: time.Since(begin)}
+				results[i] = eventResult{event: event, kind: kind, ingestion: time.Since(begin), started: begin}
+				if c.Scenario == "saturation" && i < 30 {
+					primeDone <- struct{}{}
+				}
 			}
 		}()
 	}
+	pace := newPacer(c.Rate, time.Now())
+	var submitErr error
+submit:
+	for i := 0; i < c.Events; i++ {
+		if c.Scenario == "saturation" && i == 30 {
+			for range 30 {
+				select {
+				case <-primeDone:
+				case <-ctx.Done():
+					submitErr = ctx.Err()
+					break submit
+				}
+			}
+			r.PrimedInProgress, submitErr = awaitSaturation(ctx, client, api, min(10, c.SlowEndpoints*c.SlowConcurrency))
+			if submitErr != nil {
+				break
+			}
+			pace = newPacer(c.Rate, time.Now())
+		}
+		if c.Scenario != "saturation" || i >= 30 {
+			if submitErr = pace.wait(ctx); submitErr != nil {
+				break
+			}
+		}
+		select {
+		case jobs <- i:
+			pace.observe(time.Now())
+		case <-ctx.Done():
+			submitErr = ctx.Err()
+			break submit
+		}
+	}
+	close(jobs)
 	wg.Wait()
 	close(failures)
 	for err := range failures {
 		return r, err
 	}
+	if submitErr != nil {
+		return r, submitErr
+	}
+	r.MaxPacingLagMS = pace.maxLag.Seconds() * 1000
 	r.IngestionSeconds = time.Since(started).Seconds()
 	queued, scrapeTime, err := metrics(ctx, client, api)
 	if err != nil {
@@ -293,6 +369,7 @@ func run(c config) (report, error) {
 			traces[event.ID] = parent[3:35]
 			r.TraceSamples[item.kind] = traces[event.ID]
 			elapsed := last.CompletedAt.Sub(event.CreatedAt).Seconds() * 1000
+			r.Timing.checkEvent(time.Duration(elapsed*float64(time.Millisecond)), time.Since(item.started))
 			endToEnd = append(endToEnd, elapsed)
 			byKind[item.kind] = append(byKind[item.kind], elapsed)
 			ingestion = append(ingestion, item.ingestion.Seconds()*1000)
@@ -310,6 +387,15 @@ func run(c config) (report, error) {
 		}
 	}
 	r.TotalSeconds = time.Since(started).Seconds()
+	observed.stop()
+	r.Samples = observed.samples
+	if observed.err != nil {
+		return r, observed.err
+	}
+	r.Timing.checkClock(started, time.Now())
+	for _, sample := range r.Samples {
+		r.Timing.observeDrift(sample.ClockDriftMS)
+	}
 	r.DrainSeconds = r.TotalSeconds - r.IngestionSeconds
 	r.EventsPerSecond = float64(c.Events) / r.TotalSeconds
 	r.IngestionMS = quantiles(ingestion)
@@ -401,6 +487,14 @@ func metrics(ctx context.Context, client *http.Client, api string) (map[string]f
 			}
 			if name == "webhook_queue_depth" {
 				values["unfinished"] += metric.Gauge.GetValue()
+				for _, label := range metric.Label {
+					if label.GetName() == "state" {
+						values[label.GetValue()] += metric.Gauge.GetValue()
+					}
+				}
+			}
+			if name == "webhook_oldest_ready_seconds" {
+				values["oldest_ready_seconds"] = metric.Gauge.GetValue()
 			}
 			if name == "webhook_attempts_completed_total" {
 				values["completed"] += metric.Counter.GetValue()

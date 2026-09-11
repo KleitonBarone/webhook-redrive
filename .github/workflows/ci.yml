@@ -56,6 +56,11 @@ jobs:
         run: go run ./cmd/loadtest -scenario mixed -events 40 -revision "$GITHUB_SHA" -output load-result.json
       - name: Verify healthy deliveries beside timeouts
         run: go run ./cmd/loadtest -scenario fairness -events 40 -revision "$GITHUB_SHA" -output fairness-result.json
+      - name: Stop demo before isolated measurement
+        run: docker compose stop
+      - name: Verify paced saturation and database evidence
+        shell: pwsh
+        run: ./scripts/measure-load.ps1 -Scenario saturation -Events 40 -Rate 10 -SlowEndpoints 5 -SlowConcurrency 2
       - name: Save workload evidence
         uses: actions/upload-artifact@v4
         with:
@@ -63,6 +68,7 @@ jobs:
           path: |
             load-result.json
             fairness-result.json
+            artifacts/benchmark/**/*.json
       - name: Show logs on failure
         if: failure()
         run: docker compose logs --no-color

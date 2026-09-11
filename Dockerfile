@@ -7,6 +7,15 @@ RUN CGO_ENABLED=0 go build -trimpath -o /out/api ./cmd/api \
     && CGO_ENABLED=0 go build -trimpath -o /out/worker ./cmd/worker \
     && CGO_ENABLED=0 go build -trimpath -o /out/receiver ./cmd/receiver
 
+FROM build AS loadtest-build
+RUN CGO_ENABLED=0 go build -trimpath -o /out/loadtest ./cmd/loadtest
+
+FROM alpine:3.22 AS loadtest
+RUN adduser -D -u 10001 app
+USER app
+COPY --from=loadtest-build /out/loadtest /usr/local/bin/loadtest
+ENTRYPOINT ["loadtest"]
+
 FROM alpine:3.22 AS api
 RUN adduser -D -u 10001 app
 USER app
