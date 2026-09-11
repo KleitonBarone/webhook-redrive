@@ -22,7 +22,12 @@ $output = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $runDirectory = Join-Path $output $project
 New-Item -ItemType Directory $runDirectory | Out-Null
 $previousOutput = $env:BENCHMARK_OUTPUT_DIR
+$previousUser = $env:BENCHMARK_USER
 $env:BENCHMARK_OUTPUT_DIR = $runDirectory
+if ($IsLinux) {
+    $benchmarkUID, $benchmarkGID = (& id -u), (& id -g)
+    $env:BENCHMARK_USER = "${benchmarkUID}:$benchmarkGID"
+}
 
 function Invoke-Docker {
     if ($WSLDistro) { $result = & wsl.exe -d $WSLDistro -- env "BENCHMARK_OUTPUT_DIR=$env:BENCHMARK_OUTPUT_DIR" docker @args }
@@ -72,4 +77,5 @@ try {
     if ($samplerJob) { Stop-Job $samplerJob; Remove-Job $samplerJob }
     Invoke-Docker @compose stop
     $env:BENCHMARK_OUTPUT_DIR = $previousOutput
+    $env:BENCHMARK_USER = $previousUser
 }

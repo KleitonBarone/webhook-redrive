@@ -12,5 +12,6 @@ services:
     # Linux host networking puts the generator on the services' kernel clock
     # while preserving the existing loopback-only URL checks.
     network_mode: host
+    user: ${BENCHMARK_USER:-10001}
     volumes:
       - ${BENCHMARK_OUTPUT_DIR:-./artifacts/benchmark}:/evidence
