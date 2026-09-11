@@ -112,11 +112,13 @@ The race detector requires CGO and a C compiler. Tests create and drop uniquely 
 
 The API and worker require `DATABASE_URL` and `MASTER_KEY`, a base64-encoded 32-byte AES key. Compose supplies synthetic local values. Worker defaults are `OUTBOUND_TIMEOUT=2s`, `CLAIM_LEASE=10s`, `POLL_PERIOD=250ms`, and `BATCH_SIZE=10`. The lease must exceed the request timeout; batch size must be 1..1000. `API_ADDR` defaults to `:8080`. Both processes export OpenTelemetry spans to stdout by default; set `TRACE_EXPORTER=none` to disable export.
 
+`BATCH_SIZE` bounds in-flight deliveries per worker. Each completion frees a slot for another claim; a slow request does not hold a whole batch open. `POLL_PERIOD` discovers new or delayed work and retries failed claims. Endpoint limits still apply across workers. This is not strict fairness: slow endpoints can block healthy work if they occupy all slots. See [worker scheduling](docs/decisions/0004-worker-scheduling.md).
+
 Both binaries apply embedded migrations at startup under an advisory lock. To upgrade, stop the API and worker, rebuild, and start both together. Migration 002 preserves event history and leaves existing failures terminal until replayed. Migration 003 adds durable trace context; older attempts begin without an ingestion trace. Mixed versions are unsupported.
 
 ## Next steps
 
-The planned milestones are complete. Retention, circuit breaking, quotas, and queue changes remain optional and need evidence. The first measured performance follow-up is worker polling and fairness under slow receivers. See [ROADMAP.md](ROADMAP.md).
+The planned milestones and the [worker scheduling experiment](docs/benchmarks/scheduling/README.md) are complete. Sustained-load database cost and saturation across multiple slow endpoints remain unmeasured. Retention, circuit breaking, quotas, and queue changes remain optional and need evidence. See [ROADMAP.md](ROADMAP.md).
 
 ## License
 

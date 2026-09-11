@@ -26,6 +26,8 @@ The repository uses Go 1.24, `net/http`, pgx v5, and PostgreSQL 17. Keep one Go 
 
 `cmd/loadtest` is a local development tool, not another service. Read `docs/decisions/0003-observability.md` before changing tracing or database-derived metric accounting. History deletion would invalidate the current cumulative metrics.
 
+Read `docs/decisions/0004-worker-scheduling.md` before changing worker polling or dispatch concurrency. Keep claims bounded by free local slots, preserve shutdown waiting, and do not describe completion-driven scheduling as strict endpoint fairness.
+
 ## Verification
 
 Run the local checks with:
@@ -40,7 +42,7 @@ PostgreSQL integration tests require `TEST_DATABASE_URL`. Start the local databa
 
 Run `pwsh -File scripts/demo.ps1` against the local Compose stack to verify retry recovery, dead-letter exhaustion, replay, signatures, and unchanged payload bytes. Read `docs/decisions/0002-failure-handling.md` before changing retry budgets, claim locking, or replay semantics.
 
-Run `go run ./cmd/loadtest -scenario mixed -events 40` on an isolated idle local stack for the CI-sized workload. Publish real JSON results with their revision and environment; do not turn shared-runner timing into performance assertions.
+Run `go run ./cmd/loadtest -scenario mixed -events 40` and `go run ./cmd/loadtest -scenario fairness -events 40` on an isolated idle local stack for the CI-sized workloads. Publish real JSON results with their revision and environment; do not turn shared-runner timing into performance assertions.
 
 Prioritize tests for state transitions, retry timing, concurrent claims, crash recovery, signature verification, rate limits, and replay. Use a controllable clock and deterministic jitter in tests.
 

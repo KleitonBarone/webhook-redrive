@@ -2,6 +2,8 @@
 
 Measured on 2026-09-10 UTC at source revision `47f6ecaae0f4d61e3315bfa41b8cf10a5c54b1d4`. These are finite workload results on one developer machine, not a production capacity claim.
 
+The subsequent [worker scheduling comparison](scheduling/README.md) tests the polling and slow-batch limitation identified here. This page preserves the original milestone 3 measurements.
+
 ## Environment
 
 - AMD Ryzen 7 5700X3D, 8 physical cores and 16 logical CPUs.

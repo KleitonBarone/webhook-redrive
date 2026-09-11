@@ -71,12 +71,15 @@ Against an otherwise idle local stack:
 go run ./cmd/loadtest -scenario success -events 200 -concurrency 10
 go run ./cmd/loadtest -scenario retry -events 200 -concurrency 10
 go run ./cmd/loadtest -scenario mixed -events 200 -concurrency 10
+go run ./cmd/loadtest -scenario fairness -events 40 -concurrency 10
 ```
 
 `success` sends to a 204 receiver. `retry` gets one 500 then a 204 for each event. `mixed` uses 70% success, 20% retry, 5% terminal 400, and 5% timeout, so its event count must be a multiple of 20. The timeout scenario exhausts a two-attempt budget. Each run registers fresh synthetic endpoints, sends 256-byte bodies, and uses endpoint concurrency 10 and rate limit 1,000.
+
+`fairness` uses 90% success and 10% timeout; its event count must be a multiple of 10. Only its timeout endpoint uses concurrency 2, leaving slots for healthy work in the default ten-slot worker. Reports include completion percentiles by receiver kind so slow work cannot hide healthy-endpoint latency in an aggregate. This workload does not test full-slot saturation or guarantee fairness.
 
 The runner permits only loopback API/history addresses and the local `receiver` hostname for the destination. It refuses redirects. Every measured event must reach the expected outcome; the receiver must show the expected number of signed, unchanged bodies with matching trace IDs. Metric deltas must agree with history. The default whole-run deadline is two minutes. Reports are written only after all assertions pass.
 
 Use `-output result.json` to save a report and `-revision <commit>` to label its source. This is closed-loop ingestion followed by polling until completion, not a constant-arrival-rate benchmark. Throughput includes drain and polling overhead. Event-completion percentiles come from stored timestamps, not polling observation times. Setup, signature verification of receiver history, and final metric verification are outside the timed workload. Three metric scrapes are measured separately. No CPU/RAM sampling or sustained-load claim is made.
 
-CI runs a small mixed workload as a correctness check and saves its JSON artifact. Performance numbers are evidence to inspect, not timing gates on shared runners.
+CI runs small mixed and fairness workloads as correctness checks and saves their JSON artifacts. Performance numbers are evidence to inspect, not timing gates on shared runners.

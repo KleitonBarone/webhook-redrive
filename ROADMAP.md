@@ -40,6 +40,17 @@ Implemented with OpenTelemetry trace propagation through durable attempts, datab
 
 ## Later, if justified
 
+### Measured follow-up: worker scheduling
+
+- [x] Compare polling intervals and batch blocking beside a timeout receiver
+- [x] Refill free worker slots without waiting for a full batch
+- [x] Test bounded claims, controlled polling, and cancellation
+- [x] Publish [local comparison evidence](docs/benchmarks/scheduling/README.md) and add the failure mix to CI
+
+This does not guarantee strict fairness when slow endpoints occupy all slots. Sustained database cost and multi-worker saturation remain unmeasured.
+
+### Optional product work
+
 - [ ] Event retention policies
 - [ ] Endpoint circuit breaking
 - [ ] Multi-tenant quotas
