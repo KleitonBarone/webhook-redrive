@@ -39,26 +39,27 @@ type percentiles struct {
 	P99 float64 `json:"p99"`
 }
 type report struct {
-	StartedAt           time.Time          `json:"started_at"`
-	Revision            string             `json:"revision"`
-	Runtime             string             `json:"runtime"`
-	Scenario            string             `json:"scenario"`
-	Events              int                `json:"events"`
-	Concurrency         int                `json:"ingestion_concurrency"`
-	PayloadBytes        int                `json:"payload_bytes"`
-	IngestionSeconds    float64            `json:"ingestion_seconds"`
-	DrainSeconds        float64            `json:"drain_seconds"`
-	TotalSeconds        float64            `json:"total_seconds"`
-	EventsPerSecond     float64            `json:"completed_events_per_second"`
-	IngestionMS         percentiles        `json:"ingestion_ack_ms"`
-	EndToEndMS          percentiles        `json:"event_completion_ms"`
-	States              map[string]int     `json:"states"`
-	Attempts            int                `json:"attempts"`
-	VerifiedDeliveries  int                `json:"verified_signed_unchanged_deliveries"`
-	TraceSamples        map[string]string  `json:"trace_samples"`
-	QueueAfterIngestion float64            `json:"unfinished_after_ingestion"`
-	MaxScrapeMS         float64            `json:"max_of_three_scrape_ms"`
-	CountersDelta       map[string]float64 `json:"committed_counter_deltas"`
+	StartedAt           time.Time              `json:"started_at"`
+	Revision            string                 `json:"revision"`
+	Runtime             string                 `json:"runtime"`
+	Scenario            string                 `json:"scenario"`
+	Events              int                    `json:"events"`
+	Concurrency         int                    `json:"ingestion_concurrency"`
+	PayloadBytes        int                    `json:"payload_bytes"`
+	IngestionSeconds    float64                `json:"ingestion_seconds"`
+	DrainSeconds        float64                `json:"drain_seconds"`
+	TotalSeconds        float64                `json:"total_seconds"`
+	EventsPerSecond     float64                `json:"completed_events_per_second"`
+	IngestionMS         percentiles            `json:"ingestion_ack_ms"`
+	EndToEndMS          percentiles            `json:"event_completion_ms"`
+	CompletionByKind    map[string]percentiles `json:"completion_ms_by_receiver"`
+	States              map[string]int         `json:"states"`
+	Attempts            int                    `json:"attempts"`
+	VerifiedDeliveries  int                    `json:"verified_signed_unchanged_deliveries"`
+	TraceSamples        map[string]string      `json:"trace_samples"`
+	QueueAfterIngestion float64                `json:"unfinished_after_ingestion"`
+	MaxScrapeMS         float64                `json:"max_of_three_scrape_ms"`
+	CountersDelta       map[string]float64     `json:"committed_counter_deltas"`
 }
 
 type eventResult struct {
@@ -72,7 +73,7 @@ func main() {
 	flag.StringVar(&c.API, "api", "http://localhost:8080", "local API URL")
 	flag.StringVar(&c.Receiver, "receiver", "http://receiver:9090", "synthetic receiver URL as seen by the worker")
 	flag.StringVar(&c.History, "history", "http://localhost:9090", "local receiver history URL")
-	flag.StringVar(&c.Scenario, "scenario", "success", "success, retry, or mixed")
+	flag.StringVar(&c.Scenario, "scenario", "success", "success, retry, mixed, or fairness")
 	flag.StringVar(&c.Output, "output", "", "optional JSON report path")
 	flag.StringVar(&c.Revision, "revision", "working-tree", "source revision label recorded in the report")
 	flag.IntVar(&c.Events, "events", 200, "finite number of events; mixed requires a multiple of 20")
@@ -110,11 +111,14 @@ func validate(c config) error {
 	if c.Events < 1 || c.Events > 10000 || c.Concurrency < 1 || c.Concurrency > 64 || c.Deadline <= 0 || c.Deadline > 10*time.Minute {
 		return errors.New("events must be 1..10000, concurrency 1..64, deadline 0..10m")
 	}
-	if c.Scenario != "success" && c.Scenario != "retry" && c.Scenario != "mixed" {
-		return errors.New("scenario must be success, retry, or mixed")
+	if c.Scenario != "success" && c.Scenario != "retry" && c.Scenario != "mixed" && c.Scenario != "fairness" {
+		return errors.New("scenario must be success, retry, mixed, or fairness")
 	}
 	if c.Scenario == "mixed" && c.Events%20 != 0 {
 		return errors.New("mixed events must be a multiple of 20")
+	}
+	if c.Scenario == "fairness" && c.Events%10 != 0 {
+		return errors.New("fairness events must be a multiple of 10")
 	}
 	for _, target := range []struct {
 		raw      string
@@ -133,6 +137,12 @@ func validate(c config) error {
 }
 
 func kindFor(scenario string, i int) string {
+	if scenario == "fairness" {
+		if i%10 == 0 {
+			return "timeout"
+		}
+		return "success"
+	}
 	if scenario == "retry" {
 		return "retry"
 	}
@@ -157,7 +167,7 @@ func run(c config) (report, error) {
 	client := &http.Client{Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	defer client.CloseIdleConnections()
 	r := report{StartedAt: time.Now().UTC(), Revision: c.Revision, Runtime: runtime.Version() + " " + runtime.GOOS + "/" + runtime.GOARCH,
-		Scenario: c.Scenario, Events: c.Events, Concurrency: c.Concurrency, States: map[string]int{}, TraceSamples: map[string]string{}, CountersDelta: map[string]float64{}}
+		Scenario: c.Scenario, Events: c.Events, Concurrency: c.Concurrency, States: map[string]int{}, TraceSamples: map[string]string{}, CountersDelta: map[string]float64{}, CompletionByKind: map[string]percentiles{}}
 	api, history := strings.TrimRight(c.API, "/"), strings.TrimRight(c.History, "/")
 	before, scrapeTime, err := metrics(ctx, client, api)
 	if err != nil {
@@ -177,7 +187,11 @@ func run(c config) (report, error) {
 			continue
 		}
 		route := map[string]string{"success": "/success", "retry": "/flaky?failures=1", "reject": "/reject", "timeout": "/timeout"}[kind]
-		body, _ := json.Marshal(map[string]any{"url": strings.TrimRight(c.Receiver, "/") + route, "secret": "local-demo-secret-32-bytes-long", "max_attempts": 2, "concurrency_limit": 10, "rate_limit": 1000})
+		concurrency := 10
+		if c.Scenario == "fairness" && kind == "timeout" {
+			concurrency = 2
+		}
+		body, _ := json.Marshal(map[string]any{"url": strings.TrimRight(c.Receiver, "/") + route, "secret": "local-demo-secret-32-bytes-long", "max_attempts": 2, "concurrency_limit": concurrency, "rate_limit": 1000})
 		var endpoint store.Endpoint
 		if err := call(ctx, client, "POST", api+"/v1/endpoints", body, 201, &endpoint); err != nil {
 			return r, err
@@ -226,6 +240,7 @@ func run(c config) (report, error) {
 	r.QueueAfterIngestion = queued["unfinished"]
 	pending := append([]eventResult(nil), results...)
 	var endToEnd, ingestion []float64
+	byKind := map[string][]float64{}
 	expectedDeliveries := map[string]int{}
 	traces := map[string]string{}
 	for len(pending) > 0 {
@@ -277,7 +292,9 @@ func run(c config) (report, error) {
 			}
 			traces[event.ID] = parent[3:35]
 			r.TraceSamples[item.kind] = traces[event.ID]
-			endToEnd = append(endToEnd, last.CompletedAt.Sub(event.CreatedAt).Seconds()*1000)
+			elapsed := last.CompletedAt.Sub(event.CreatedAt).Seconds() * 1000
+			endToEnd = append(endToEnd, elapsed)
+			byKind[item.kind] = append(byKind[item.kind], elapsed)
 			ingestion = append(ingestion, item.ingestion.Seconds()*1000)
 			r.States[event.State]++
 			r.Attempts += wantAttempts
@@ -297,6 +314,9 @@ func run(c config) (report, error) {
 	r.EventsPerSecond = float64(c.Events) / r.TotalSeconds
 	r.IngestionMS = quantiles(ingestion)
 	r.EndToEndMS = quantiles(endToEnd)
+	for kind, values := range byKind {
+		r.CompletionByKind[kind] = quantiles(values)
+	}
 	var received struct {
 		Deliveries []struct {
 			EventID        string `json:"event_id"`

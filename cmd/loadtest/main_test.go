@@ -13,6 +13,13 @@ func TestWorkloadMixAndLocalBoundary(t *testing.T) {
 	if counts["success"] != 70 || counts["retry"] != 20 || counts["reject"] != 5 || counts["timeout"] != 5 {
 		t.Fatalf("mix=%v", counts)
 	}
+	counts = map[string]int{}
+	for i := 0; i < 40; i++ {
+		counts[kindFor("fairness", i)]++
+	}
+	if counts["success"] != 36 || counts["timeout"] != 4 {
+		t.Fatalf("fairness mix=%v", counts)
+	}
 	c := config{API: "http://localhost:8080", History: "http://127.0.0.1:9090", Receiver: "http://receiver:9090", Events: 100, Concurrency: 10, Scenario: "mixed", Deadline: time.Minute}
 	if err := validate(c); err != nil {
 		t.Fatal(err)
