@@ -6,9 +6,9 @@ This roadmap favors a small, explainable delivery system before distributed infr
 
 Target a small engineering team self-hosting outbound webhook delivery. Its application submits JSON events to known destinations; Webhook Redrive handles durable delivery, retries, signatures, and recovery.
 
-Milestones 0 through 3 and the measured follow-ups are complete. They establish the delivery engine, not production readiness. The API still has no authentication, endpoint settings are fixed at registration, and ingestion requests are not deduplicated.
+Milestones 0 through 4 and the measured follow-ups are complete. The delivery engine now has authenticated access and deployment-controlled destinations, but this is not a production-readiness claim. Endpoint settings are still fixed at registration, and ingestion requests are not deduplicated.
 
-The next priority is making the system safe to adopt and practical to operate. Work through milestones 4 through 8 in order before further scheduling optimization. Keep one HTTP service, one worker process, and PostgreSQL. These plans do not authorize deployment or access to live systems.
+The next priority is reliable integration with producers and receivers. Work through milestones 5 through 8 in order before further scheduling optimization. Keep one HTTP service, one worker process, and PostgreSQL. These plans do not authorize deployment or access to live systems.
 
 ## 0. Foundation
 
@@ -68,17 +68,19 @@ The evidence covers one-minute success workloads and finite timeout backlogs wit
 
 ## 4. Controlled access and safe destinations
 
-Operators must control who can submit events, inspect history, change endpoints, and replay deliveries.
+Implemented with hashed, expiring bearer credentials, fixed permissions, authenticated replay attribution, and exact-origin destination rules checked again at connection time. See [access and destination setup](docs/security.md) and the [security decision](docs/decisions/0005-access-and-destinations.md).
 
-- [ ] Add authenticated service and operator identities with revocable credentials
-- [ ] Enforce permissions for ingestion, inspection, endpoint administration, and replay
-- [ ] Derive audit actors from authenticated identity rather than trusting caller-supplied labels
-- [ ] Define and enforce an outbound destination policy, including allowed schemes, hosts, ports, and resolved addresses
-- [ ] Prevent access to metadata services and unintended internal destinations; allow explicitly approved private destinations for internal integrations
-- [ ] Apply destination restrictions at connection time, covering DNS changes and redirects, not just URL registration
-- [ ] Document TLS, credential handling, and network restrictions for a non-demo installation
+- [x] Add authenticated service and operator identities with revocable credentials
+- [x] Enforce permissions for ingestion, inspection, endpoint administration, and replay
+- [x] Derive audit actors from authenticated identity rather than trusting caller-supplied labels
+- [x] Define and enforce an outbound destination policy, including allowed schemes, hosts, ports, and resolved addresses
+- [x] Prevent access to metadata services and unintended internal destinations; allow explicitly approved private destinations for internal integrations
+- [x] Apply destination restrictions at connection time, covering DNS changes and redirects, not just URL registration
+- [x] Document TLS, credential handling, and network restrictions for a non-demo installation
 
-Acceptance evidence: unauthorized and forbidden operations fail without side effects; credential revocation takes effect; destination tests cover IPv4, IPv6, DNS changes, and approved private receivers. Secrets remain absent from responses, logs, and traces.
+Acceptance evidence: the Go 1.24 race-enabled suite passed against PostgreSQL 17, covering denied operations, durable revocation, credential rotation, stable replay identity, IPv4/IPv6, DNS rebinding, proxy bypass prevention, and TLS hostname verification. The authenticated demo verifies delivery recovery, signatures, producer replay denial, blocked metadata registration, and credential revocation. API responses do not return credentials; the offline administration command returns a newly issued token once. Redaction checks cover logs and telemetry.
+
+The authenticated mixed and fairness workloads passed their correctness checks. The paced saturation workload also passed correctness checks, but a detected host-clock jump invalidated its timing results. These runs do not establish production capacity or replace the published pre-authentication benchmarks.
 
 ## 5. Reliable producer and receiver integration
 

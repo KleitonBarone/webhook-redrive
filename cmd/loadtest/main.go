@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/KleitonBarone/webhook-redrive/internal/auth"
 	"github.com/KleitonBarone/webhook-redrive/internal/store"
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
@@ -191,9 +192,19 @@ func kindFor(scenario string, i int) string {
 }
 
 func run(c config) (report, error) {
+	token := os.Getenv("API_TOKEN")
+	if _, err := auth.Hash(token); err != nil {
+		return report{}, errors.New("API_TOKEN must contain a valid credential")
+	}
+	apiURL, err := url.Parse(c.API)
+	if err != nil {
+		return report{}, errors.New("invalid API URL")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), c.Deadline)
 	defer cancel()
-	client := &http.Client{Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	base := http.DefaultTransport.(*http.Transport).Clone()
+	base.Proxy = nil
+	client := &http.Client{Transport: &apiTransport{base: base, api: apiURL, token: token}, Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	defer client.CloseIdleConnections()
 	r := report{StartedAt: time.Now().UTC(), Revision: c.Revision, Runtime: runtime.Version() + " " + runtime.GOOS + "/" + runtime.GOARCH,
 		Scenario: c.Scenario, Events: c.Events, Concurrency: c.Concurrency, Rate: c.Rate, Timing: timingCheck{Valid: true}, States: map[string]int{}, TraceSamples: map[string]string{}, CountersDelta: map[string]float64{}, CompletionByKind: map[string]percentiles{}}

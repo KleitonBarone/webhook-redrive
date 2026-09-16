@@ -14,6 +14,7 @@ func TestHandlerRedactsPayloadsAndCredentials(t *testing.T) {
 		"endpoint_secret", "do-not-log-secret",
 	)
 	logger.Info("attempt",
+		"api_token", "do-not-log-token",
 		"payload", `{"private":"do-not-log-payload"}`,
 		"request", slog.GroupValue(
 			slog.String("authorization", "do-not-log-auth"),
@@ -22,12 +23,12 @@ func TestHandlerRedactsPayloadsAndCredentials(t *testing.T) {
 	)
 
 	logged := output.String()
-	for _, sensitive := range []string{"do-not-log-secret", "do-not-log-payload", "do-not-log-auth"} {
+	for _, sensitive := range []string{"do-not-log-secret", "do-not-log-payload", "do-not-log-auth", "do-not-log-token"} {
 		if strings.Contains(logged, sensitive) {
 			t.Fatalf("log contains sensitive value %q: %s", sensitive, logged)
 		}
 	}
-	if !strings.Contains(logged, "event-123") || strings.Count(logged, redacted) != 3 {
+	if !strings.Contains(logged, "event-123") || strings.Count(logged, redacted) != 4 {
 		t.Fatalf("unexpected sanitized log: %s", logged)
 	}
 }

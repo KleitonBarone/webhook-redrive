@@ -24,7 +24,7 @@ Completion checks worker ID, claim generation, and lease expiry. A stale worker 
 
 Replay requires the latest failed or dead-letter attempt as a precondition, plus a request UUID, actor, and reason. One transaction adds the replay attempt with its audit fields. The request UUID is unique, making identical submissions idempotent even after delivery succeeds. Reusing it with different inputs returns a conflict.
 
-The API still has no authentication. The actor is a caller-supplied audit label, not a verified identity. Deployments beyond the local demo require access control before exposing these operations.
+Milestone 4 supersedes caller-supplied actor labels with authenticated principal attribution. Legacy rows remain unverified. See [access and destination decisions](0005-access-and-destinations.md) for the API compatibility change.
 
 ## Migration
 

@@ -12,6 +12,7 @@ import (
 
 	"github.com/KleitonBarone/webhook-redrive/internal/clock"
 	"github.com/KleitonBarone/webhook-redrive/internal/config"
+	"github.com/KleitonBarone/webhook-redrive/internal/destination"
 	"github.com/KleitonBarone/webhook-redrive/internal/httpapi"
 	"github.com/KleitonBarone/webhook-redrive/internal/logsafe"
 	"github.com/KleitonBarone/webhook-redrive/internal/secret"
@@ -28,6 +29,14 @@ func main() {
 }
 
 func run(logger *slog.Logger) error {
+	policyFile, err := config.Required("DESTINATION_POLICY_FILE")
+	if err != nil {
+		return err
+	}
+	policy, err := destination.Load(policyFile)
+	if err != nil {
+		return err
+	}
 	provider, err := telemetry.Provider("webhook-api", config.String("TRACE_EXPORTER", "stdout"), os.Stdout)
 	if err != nil {
 		return err
@@ -64,7 +73,7 @@ func run(logger *slog.Logger) error {
 
 	server := &http.Server{
 		Addr:              config.String("API_ADDR", ":8080"),
-		Handler:           httpapi.New(dataStore, box, serviceClock, logger, provider.Tracer("webhook-redrive")),
+		Handler:           httpapi.New(dataStore, box, serviceClock, logger, provider.Tracer("webhook-redrive"), httpapi.Security{Authenticator: dataStore, Destinations: policy}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,

@@ -2,7 +2,7 @@
 
 Webhook Redrive accepts events, signs outbound requests, and keeps delivery history in PostgreSQL. It retries temporary failures, retains exhausted deliveries, and supports audited manual replay. One HTTP service and one worker process share one durable database.
 
-Milestones 0 through 3 are implemented. The project is a local portfolio demo with no API authentication.
+Milestones 0 through 4 are implemented. The project targets a small team self-hosting outbound webhook delivery. The local demo includes bearer authentication and an outbound destination policy; it is not a production deployment.
 
 ## Run the demo
 
@@ -20,6 +20,8 @@ The script verifies two scenarios:
 
 All seven deliveries must carry valid signatures and identical body bytes. The script exits with an error if any assertion fails. PostgreSQL, API, and receiver ports bind to loopback only. Stop the stack with `docker compose down`; the database volume remains.
 
+The demo also proves that an ingestion-only credential cannot replay, unapproved destinations are rejected, and a revoked credential stops working. Compose provisions public synthetic credentials through a one-shot initialization job, not an unauthenticated API. Never use these credentials or the demo master key outside local development.
+
 The demo also verifies trace propagation and `/metrics`. Follow trace IDs through ingestion, queueing, retries, and replay using `docker compose logs --no-log-prefix api worker`. [Telemetry instructions](docs/observability.md) explain the spans, metric definitions, and load checks.
 
 [Published local results](docs/benchmarks/README.md) cover 1,800 events and 2,550 verified deliveries across success, retry, and mixed-failure workloads. They include raw JSON, the tested revision, hardware, and measurement limits. They are not a production throughput claim.
@@ -33,7 +35,9 @@ The synthetic receiver supports `/success`, `/reject` for HTTP 400, `/fail` for 
 Register a receiver, including its delivery budget and limits:
 
 ```powershell
-$endpoint = Invoke-RestMethod -Method Post -Uri http://localhost:8080/v1/endpoints -ContentType application/json -Body (@{
+$env:API_TOKEN = "wr_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" # Public local-demo credential
+$headers = @{ Authorization = "Bearer $env:API_TOKEN" }
+$endpoint = Invoke-RestMethod -Headers $headers -Method Post -Uri http://localhost:8080/v1/endpoints -ContentType application/json -Body (@{
     url = "http://receiver:9090/flaky?failures=2"
     secret = "local-demo-secret-32-bytes-long"
     max_attempts = 5
@@ -43,6 +47,7 @@ $endpoint = Invoke-RestMethod -Method Post -Uri http://localhost:8080/v1/endpoin
 
 $event = Invoke-RestMethod -Method Post -Uri "http://localhost:8080/v1/endpoints/$($endpoint.id)/events" -ContentType application/json -Headers @{
     "X-Event-Type" = "order.created"
+    "Authorization" = "Bearer $env:API_TOKEN"
 } -Body '{"order_id":"demo-42","amount":1250}'
 ```
 
@@ -59,9 +64,9 @@ Endpoint settings are optional and fixed at registration:
 Inspect delivery progress:
 
 ```powershell
-Invoke-RestMethod "http://localhost:8080/v1/events/$($event.id)"
-Invoke-RestMethod "http://localhost:8080/v1/events/$($event.id)/attempts"
-Invoke-RestMethod "http://localhost:8080/v1/dead-letters"
+Invoke-RestMethod -Headers $headers "http://localhost:8080/v1/events/$($event.id)"
+Invoke-RestMethod -Headers $headers "http://localhost:8080/v1/events/$($event.id)/attempts"
+Invoke-RestMethod -Headers $headers "http://localhost:8080/v1/dead-letters"
 ```
 
 History exposes attempt number, cycle attempt, scheduled time, claim count, retry classification, response status, and replay audit fields. Event state follows the latest attempt. The dead-letter list returns at most 100 events; pass its `next_after` value as `?after=...` for the next page.
@@ -69,17 +74,22 @@ History exposes attempt number, cycle attempt, scheduled time, claim count, retr
 To replay a failed or exhausted event:
 
 ```powershell
-$history = (Invoke-RestMethod "http://localhost:8080/v1/events/$($event.id)/attempts").attempts
+$history = (Invoke-RestMethod -Headers $headers "http://localhost:8080/v1/events/$($event.id)/attempts").attempts
 $replay = @{
     attempt_id = $history[-1].id
     request_id = [guid]::NewGuid().ToString()
-    actor = "local-operator"
     reason = "Receiver repaired"
 } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri "http://localhost:8080/v1/events/$($event.id)/replays" -ContentType application/json -Body $replay
+Invoke-RestMethod -Headers $headers -Method Post -Uri "http://localhost:8080/v1/events/$($event.id)/replays" -ContentType application/json -Body $replay
 ```
 
-Replay requires the current `failed` or `dead_letter` attempt. It preserves the event ID, payload, and old history, and starts a new retry cycle. Repeat the same request body after an ambiguous API response; it returns the original replay attempt. Conflicting inputs or a stale attempt ID return HTTP 409. The actor is caller-supplied, not authenticated.
+Replay requires the current `failed` or `dead_letter` attempt. It preserves the event ID, payload, and old history, and starts a new retry cycle. Repeat the same request body under the same principal after an ambiguous API response; it returns the original replay attempt. Conflicting inputs or a stale attempt ID return HTTP 409. The server records the authenticated principal and rejects caller-supplied `actor` fields. Legacy history without `replay_principal_id` remains unverified.
+
+## Access and approved destinations
+
+Every API operation except `/healthz` requires a bearer credential. Fixed permissions cover ingestion, inspection, endpoint registration, replay, and metrics. Permissions are instance-wide, not tenant or endpoint isolation. PostgreSQL stores credential hashes and revocation state; `cmd/admin` provisions and revokes credentials using database access.
+
+API and worker require the same destination-policy file. Compose approves only `http://receiver:9090` with explicit Docker private-network exceptions. The worker checks resolved addresses at connection time, refuses redirects and environment proxies, and records a terminal `destination_denied` failure for blocked destinations. See [security setup](docs/security.md) for credential commands, TLS requirements, policy examples, and upgrade instructions.
 
 ## Delivery contract
 
@@ -112,15 +122,17 @@ go test -race -count=1 ./...
 
 The race detector requires CGO and a C compiler. Tests create and drop uniquely named schemas; the test database role needs permission to create schemas. Existing demo tables are not truncated. Integration tests skip when the URL is absent locally and fail if it is absent in CI.
 
-The API and worker require `DATABASE_URL` and `MASTER_KEY`, a base64-encoded 32-byte AES key. Compose supplies synthetic local values. Worker defaults are `OUTBOUND_TIMEOUT=2s`, `CLAIM_LEASE=10s`, `POLL_PERIOD=250ms`, and `BATCH_SIZE=10`. The lease must exceed the request timeout; batch size must be 1..1000. `API_ADDR` defaults to `:8080`. Both processes export OpenTelemetry spans to stdout by default; set `TRACE_EXPORTER=none` to disable export.
+The API and worker require `DATABASE_URL`, `MASTER_KEY` as a base64-encoded 32-byte AES key, and `DESTINATION_POLICY_FILE`. Compose supplies synthetic local values and a mounted demo policy. Worker defaults are `OUTBOUND_TIMEOUT=2s`, `CLAIM_LEASE=10s`, `POLL_PERIOD=250ms`, and `BATCH_SIZE=10`. The lease must exceed the request timeout; batch size must be 1..1000. `API_ADDR` defaults to `:8080`. Both processes export OpenTelemetry spans to stdout by default; set `TRACE_EXPORTER=none` to disable export.
 
 `BATCH_SIZE` bounds in-flight deliveries per worker. Each completion frees a slot for another claim; a slow request does not hold a whole batch open. `POLL_PERIOD` discovers new or delayed work and retries failed claims. Endpoint limits still apply across workers. This is not strict fairness: slow endpoints can block healthy work if they occupy all slots. See [worker scheduling](docs/decisions/0004-worker-scheduling.md).
 
 Both binaries apply embedded migrations at startup under an advisory lock. To upgrade, stop the API and worker, rebuild, and start both together. Migration 002 preserves event history and leaves existing failures terminal until replayed. Migration 003 adds durable trace context; older attempts begin without an ingestion trace. Mixed versions are unsupported.
 
+Migration 004 adds credentials and principal attribution without rewriting old actor labels. Upgrading clients requires bearer credentials and replay requests without `actor`. Policy changes require restarting API and workers. Load tools require `API_TOKEN`, send it only to the API, and never include it in reports.
+
 ## Next steps
 
-The planned milestones, [worker scheduling experiment](docs/benchmarks/scheduling/README.md), and [one-minute paced-load measurements](docs/benchmarks/sustained/README.md) are complete. Full-slot saturation still delays healthy deliveries. Decide whether bounded healthy-endpoint latency is a product requirement before adding a fairness policy. Longer runs, larger histories, and multi-worker scaling remain unmeasured. See [ROADMAP.md](ROADMAP.md).
+Next is milestone 5: ingestion idempotency, a transactional-outbox example, and reusable receiver verification. Endpoint lifecycle, longer retry horizons, bulk recovery, and long-running operations follow. Fair scheduling remains deferred. Existing [load measurements](docs/benchmarks/sustained/README.md) predate authentication and are not production capacity claims. See [ROADMAP.md](ROADMAP.md).
 
 ## License
 

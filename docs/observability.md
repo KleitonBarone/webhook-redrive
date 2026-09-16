@@ -5,7 +5,9 @@ Start the local stack and run `pwsh -File scripts/demo.ps1`. It verifies retry r
 ## Follow a trace
 
 ```powershell
-$history = (Invoke-RestMethod "http://localhost:8080/v1/events/$eventId/attempts").attempts
+$env:API_TOKEN = "wr_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" # Public local demo only
+$headers = @{ Authorization = "Bearer $env:API_TOKEN" }
+$history = (Invoke-RestMethod -Headers $headers "http://localhost:8080/v1/events/$eventId/attempts").attempts
 $traceId = $history[0].trace_parent.Split('-')[1]
 docker compose logs --no-log-prefix api worker | Select-String $traceId
 ```
@@ -31,7 +33,7 @@ Each claim generation gets its own queue/delivery spans, including crash recover
 ## Scrape metrics
 
 ```powershell
-(Invoke-WebRequest http://localhost:8080/metrics).Content
+(Invoke-WebRequest -Headers $headers http://localhost:8080/metrics).Content
 ```
 
 | Metric | Meaning |
@@ -65,7 +67,7 @@ The ratio is undefined when there are no completed attempts in the window. It me
 
 ## Local load checks
 
-Against an otherwise idle local stack:
+Against an otherwise idle local stack, set `API_TOKEN` as above first. The load tool requires ingestion, endpoint-registration, inspection, and metrics permissions. It sends credentials only to the API origin, never receiver history, and excludes them from its reports.
 
 ```console
 go run ./cmd/loadtest -scenario success -events 200 -concurrency 10
@@ -109,6 +111,6 @@ The opt-in `compose.benchmark.yml` enables PostgreSQL statement statistics and I
 
 Before/after SQL snapshots group statement calls, execution milliseconds, buffer activity, and WAL bytes. Subtract matching groups; absent groups start at zero. Reject comparisons if statistics reset or entries were evicted. Execution time is not CPU time and excludes planning unless separately tracked. The snapshot interval includes setup, ingestion, drain, history verification, and observation. Database cumulative counters can lag active backends. See PostgreSQL's [statement statistics](https://www.postgresql.org/docs/17/pgstatstatements.html) and [cumulative statistics](https://www.postgresql.org/docs/17/monitoring-stats.html) definitions.
 
-The `claim_endpoints` group's call count measures claim-selection queries, including empty polls. `claim_attempts` counts claim CTE executions, not individual leases. Their rows count claimed attempts. The `metrics` group covers grouped attempt queries, not the entire exporter. `other` includes ingestion, completion, history reads, and unmatched statements. `observer` isolates the statistics query itself.
+The `claim_endpoints` group's call count measures claim-selection queries, including empty polls. `claim_attempts` counts claim CTE executions, not individual leases. Their rows count claimed attempts. The `metrics` group covers grouped attempt queries, not the entire exporter. `other` includes ingestion, completion, history reads, authentication lookups, and unmatched statements. `observer` isolates the statistics query itself. Published milestone 3 timings predate authentication and do not measure its cost.
 
 Container samples use `docker stats --no-stream`, followed by a five-second pause. Keep their actual timestamps; the effective interval includes command latency. CPU percentages can exceed 100% across cores, and sampled peaks can miss short spikes. Sampling excludes the load-generator container and is not an end-to-end CPU profile. [Published paced-load evidence](benchmarks/sustained/README.md) records the measured environment and remaining limits.

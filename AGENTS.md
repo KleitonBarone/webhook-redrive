@@ -4,7 +4,7 @@
 
 Webhook Redrive is a reliable webhook delivery service. The hard parts are delivery state, retries, duplicate handling, signatures, and enough telemetry to explain every attempt.
 
-Read `README.md` and `ROADMAP.md` before changing scope. Milestones 0 through 3 are implemented. Local load evidence is in `docs/benchmarks/README.md`; do not describe those finite workloads as production capacity.
+Read `README.md` and `ROADMAP.md` before changing scope. Milestones 0 through 4 are implemented. Local load evidence is in `docs/benchmarks/README.md`; it predates authentication and is not production capacity.
 
 ## Product rules
 
@@ -17,6 +17,8 @@ Read `README.md` and `ROADMAP.md` before changing scope. Milestones 0 through 3 
 - Commit failed outcomes and scheduled retries atomically. Fence completion with worker ID, claim generation, and lease expiry.
 - Reserve endpoint limits in PostgreSQL so they hold across workers. Replay must preserve history and deduplicate repeated request IDs.
 - Keep telemetry attributes explicit. Do not add raw URLs, errors, event types, baggage, or replay actor/reason to spans. Metric labels must remain bounded state/outcome enums.
+- Protect every business route and `/metrics` with its permission. Never add an authentication bypass for tests or demos. New replay attribution comes from the authenticated principal, not request JSON.
+- Read `docs/decisions/0005-access-and-destinations.md` before changing credentials or outbound HTTP. Preserve connection-time address checks, literal-IP dialing, TLS hostname verification, and disabled proxies/redirects. Keep policy immutable for each connection pool.
 
 ## Keep the first system small
 
@@ -25,6 +27,8 @@ Start with one HTTP service, one worker process, and one durable database. Do no
 The repository uses Go 1.24, `net/http`, pgx v5, and PostgreSQL 17. Keep one Go module with `cmd/api`, `cmd/worker`, and `cmd/receiver`. See `docs/decisions/0001-foundation.md` before changing these choices.
 
 `cmd/loadtest` is a local development tool, not another service. Read `docs/decisions/0003-observability.md` before changing tracing or database-derived metric accounting. History deletion would invalidate the current cumulative metrics.
+
+`cmd/admin` is an offline database utility. Compose's `access-init` is a one-shot synthetic credential seed, not a deployed authentication service. Never reuse demo credentials outside the local stack.
 
 Read `docs/decisions/0004-worker-scheduling.md` before changing worker polling or dispatch concurrency. Keep claims bounded by free local slots, preserve shutdown waiting, and do not describe completion-driven scheduling as strict endpoint fairness.
 
@@ -40,9 +44,9 @@ go test -race -count=1 ./...
 
 PostgreSQL integration tests require `TEST_DATABASE_URL`. Start the local database with `docker compose up -d postgres --wait`. Tests create isolated schemas and must not truncate existing demo tables. CI requires the test URL and runs the complete suite.
 
-Run `pwsh -File scripts/demo.ps1` against the local Compose stack to verify retry recovery, dead-letter exhaustion, replay, signatures, and unchanged payload bytes. Read `docs/decisions/0002-failure-handling.md` before changing retry budgets, claim locking, or replay semantics.
+Run `pwsh -File scripts/demo.ps1` against the local Compose stack to verify retry recovery, dead-letter exhaustion, authenticated replay, signatures, unchanged payload bytes, permission denial, destination rejection, and revocation. Pass `-ComposeProject <name>` for an isolated project and `-WSLDistro Ubuntu` when Docker runs in WSL. Read `docs/decisions/0002-failure-handling.md` before changing retry budgets, claim locking, or replay semantics.
 
-Run `go run ./cmd/loadtest -scenario mixed -events 40` and `go run ./cmd/loadtest -scenario fairness -events 40` on an isolated idle local stack for the CI-sized workloads. Publish real JSON results with their revision and environment; do not turn shared-runner timing into performance assertions.
+Set `API_TOKEN` to the synthetic Compose credential documented in README before running `go run ./cmd/loadtest -scenario mixed -events 40` and `go run ./cmd/loadtest -scenario fairness -events 40` on an isolated idle local stack. Publish real JSON results with their revision and environment; do not turn shared-runner timing into performance assertions.
 
 Use `scripts/measure-load.ps1` for paced-load/database evidence. Its benchmark override and statement statistics belong only on fresh local projects. Preserve raw reports, exclude invalid timing, and check statistics reset/eviction before comparing deltas. The saturation workload assumes one ten-slot worker; it does not prove multi-worker fairness.
 

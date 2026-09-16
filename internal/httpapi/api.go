@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/KleitonBarone/webhook-redrive/internal/auth"
 	"github.com/KleitonBarone/webhook-redrive/internal/clock"
 	"github.com/KleitonBarone/webhook-redrive/internal/id"
 	"github.com/KleitonBarone/webhook-redrive/internal/secret"
@@ -39,27 +40,28 @@ type dataStore interface {
 }
 
 type API struct {
-	tracer trace.Tracer
-	store  dataStore
-	box    *secret.Box
-	clock  clock.Clock
-	logger *slog.Logger
+	security Security
+	tracer   trace.Tracer
+	store    dataStore
+	box      *secret.Box
+	clock    clock.Clock
+	logger   *slog.Logger
 }
 
-func New(dataStore dataStore, box *secret.Box, serviceClock clock.Clock, logger *slog.Logger, tracer trace.Tracer) http.Handler {
+func New(dataStore dataStore, box *secret.Box, serviceClock clock.Clock, logger *slog.Logger, tracer trace.Tracer, security Security) http.Handler {
 	if tracer == nil {
 		tracer = noop.NewTracerProvider().Tracer("api")
 	}
-	api := &API{store: dataStore, box: box, clock: serviceClock, logger: logger, tracer: tracer}
+	api := &API{store: dataStore, box: box, clock: serviceClock, logger: logger, tracer: tracer, security: security}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", api.health)
-	mux.HandleFunc("GET /metrics", api.metrics)
-	mux.HandleFunc("POST /v1/endpoints", api.createEndpoint)
-	mux.HandleFunc("POST /v1/endpoints/{endpointID}/events", api.traced("webhook.ingest", api.createEvent))
-	mux.HandleFunc("GET /v1/events/{eventID}", api.getEvent)
-	mux.HandleFunc("GET /v1/events/{eventID}/attempts", api.listAttempts)
-	mux.HandleFunc("POST /v1/events/{eventID}/replays", api.traced("webhook.replay", api.replay))
-	mux.HandleFunc("GET /v1/dead-letters", api.deadLetters)
+	mux.HandleFunc("GET /metrics", api.require(auth.Metrics, api.metrics))
+	mux.HandleFunc("POST /v1/endpoints", api.require(auth.Endpoints, api.createEndpoint))
+	mux.HandleFunc("POST /v1/endpoints/{endpointID}/events", api.require(auth.Ingest, api.traced("webhook.ingest", api.createEvent)))
+	mux.HandleFunc("GET /v1/events/{eventID}", api.require(auth.Inspect, api.getEvent))
+	mux.HandleFunc("GET /v1/events/{eventID}/attempts", api.require(auth.Inspect, api.listAttempts))
+	mux.HandleFunc("POST /v1/events/{eventID}/replays", api.require(auth.Replay, api.traced("webhook.replay", api.replay)))
+	mux.HandleFunc("GET /v1/dead-letters", api.require(auth.Inspect, api.deadLetters))
 	return api.logRequests(mux)
 }
 
@@ -76,11 +78,15 @@ func (a *API) createEndpoint(w http.ResponseWriter, request *http.Request) {
 		RateLimit        int    `json:"rate_limit"`
 	}{MaxAttempts: 5, ConcurrencyLimit: 2, RateLimit: 10}
 	if err := decodeJSON(w, request, &input); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		writeError(w, http.StatusBadRequest, "invalid endpoint request")
 		return
 	}
 	if err := validateEndpointURL(input.URL); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := a.security.Destinations.Validate(input.URL); err != nil {
+		writeError(w, http.StatusBadRequest, "destination denied")
 		return
 	}
 	if len(input.Secret) < minSecretBytes {
@@ -103,6 +109,7 @@ func (a *API) createEndpoint(w http.ResponseWriter, request *http.Request) {
 		return
 	}
 	endpoint := store.Endpoint{ID: endpointID, URL: input.URL, CreatedAt: a.clock.Now(),
+		CreatedBy:   auth.FromContext(request.Context()).ID,
 		MaxAttempts: input.MaxAttempts, ConcurrencyLimit: input.ConcurrencyLimit, RateLimit: input.RateLimit}
 	if err := a.store.CreateEndpoint(request.Context(), endpoint, ciphertext); err != nil {
 		a.internalError(w, request, "create endpoint", err)

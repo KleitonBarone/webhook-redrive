@@ -5,6 +5,8 @@ services:
     volumes:
       - ./scripts/benchmark-stats.sql:/benchmark-stats.sql:ro
   loadtest:
+    environment:
+      API_TOKEN: wr_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
     profiles: [benchmark]
     build:
       context: .

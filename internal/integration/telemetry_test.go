@@ -45,8 +45,6 @@ func TestTraceSurvivesQueueRetryWorkerRestartAndReplay(t *testing.T) {
 	box, _ := secret.NewBox(make([]byte, secret.KeySize))
 	var logs lockedBuffer
 	logger := slog.New(slog.NewJSONHandler(&logs, nil))
-	api := httptest.NewServer(httpapi.New(s, box, c, logger, newTracer()))
-	defer api.Close()
 	var mu sync.Mutex
 	var delivered []string
 	const payload = `{"private":"synthetic-payload-no-telemetry"}`
@@ -68,11 +66,15 @@ func TestTraceSurvivesQueueRetryWorkerRestartAndReplay(t *testing.T) {
 		}
 	}))
 	defer receiver.Close()
+	security := testSecurity(t, s, c.now, receiver.URL)
+	api := httptest.NewServer(httpapi.New(s, box, c, logger, newTracer(), security))
+	defer api.Close()
 	var endpoint store.Endpoint
 	call(t, api.URL+"/v1/endpoints", "POST", map[string]any{"url": receiver.URL + "/?token=synthetic-url-token", "secret": "synthetic-credential-no-telemetry", "max_attempts": 2}, 201, &endpoint)
 	parent := "00-11111111111111111111111111111111-2222222222222222-01"
 	request, _ := http.NewRequest("POST", api.URL+"/v1/endpoints/"+endpoint.ID+"/events", bytes.NewBufferString(payload))
 	request.Header.Set("X-Event-Type", "synthetic-event-type-no-telemetry")
+	request.Header.Set("Authorization", "Bearer "+testToken)
 	request.Header.Set("traceparent", parent)
 	request.Header.Set("tracestate", "vendor=synthetic-tracestate-secret")
 	request.Header.Set("baggage", "secret=synthetic-baggage-secret")
@@ -89,7 +91,7 @@ func TestTraceSurvivesQueueRetryWorkerRestartAndReplay(t *testing.T) {
 		t.Fatalf("ingestion: %d", response.StatusCode)
 	}
 	newWorker := func() *delivery.Worker {
-		w, err := delivery.NewWorker(s, box, c, logger, delivery.Config{Tracer: newTracer(), WorkerID: "test", Lease: 10 * time.Second, RequestTimeout: time.Second, BatchSize: 1, PollPeriod: time.Millisecond, Jitter: func() float64 { return 0 }})
+		w, err := delivery.NewWorker(s, box, c, logger, delivery.Config{Destinations: security.Destinations, Tracer: newTracer(), WorkerID: "test", Lease: 10 * time.Second, RequestTimeout: time.Second, BatchSize: 1, PollPeriod: time.Millisecond, Jitter: func() float64 { return 0 }})
 		if err != nil {
 			t.Fatal(err)
 		}

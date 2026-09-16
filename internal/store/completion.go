@@ -78,10 +78,11 @@ func (s *Store) Complete(ctx context.Context, claim ClaimedDelivery, workerID st
 }
 
 type ReplayRequest struct {
-	AttemptID string `json:"attempt_id"`
-	RequestID string `json:"request_id"`
-	Actor     string `json:"actor"`
-	Reason    string `json:"reason"`
+	AttemptID   string `json:"attempt_id"`
+	RequestID   string `json:"request_id"`
+	Actor       string `json:"-"`
+	PrincipalID string `json:"-"`
+	Reason      string `json:"reason"`
 }
 
 type ReplayResult struct {
@@ -108,11 +109,11 @@ func (s *Store) Replay(ctx context.Context, eventID string, input ReplayRequest,
 	}
 	var existing ReplayResult
 	var original ReplayRequest
-	err = tx.QueryRow(ctx, `SELECT id,event_id,replay_request_id,replay_of,replay_actor,replay_reason
+	err = tx.QueryRow(ctx, `SELECT id,event_id,replay_request_id,replay_of,replay_actor,replay_reason,coalesce(replay_principal_id::text,'')
         FROM delivery_attempts WHERE replay_request_id=$1`, input.RequestID).Scan(
-		&existing.AttemptID, &existing.EventID, &existing.RequestID, &original.AttemptID, &original.Actor, &original.Reason)
+		&existing.AttemptID, &existing.EventID, &existing.RequestID, &original.AttemptID, &original.Actor, &original.Reason, &original.PrincipalID)
 	if err == nil {
-		if existing.EventID != eventID || original.AttemptID != input.AttemptID || original.Actor != input.Actor || original.Reason != input.Reason {
+		if existing.EventID != eventID || original.AttemptID != input.AttemptID || original.PrincipalID != input.PrincipalID || original.Reason != input.Reason || (input.PrincipalID == "" && original.Actor != input.Actor) {
 			return ReplayResult{}, ErrConflict
 		}
 		return existing, nil
@@ -139,9 +140,9 @@ func (s *Store) Replay(ctx context.Context, eventID string, input ReplayRequest,
 	}
 	_, err = tx.Exec(ctx, `INSERT INTO delivery_attempts
         (id,event_id,endpoint_id,state,attempt_number,cycle_attempt,max_attempts,available_at,created_at,updated_at,
-         replay_of,replay_request_id,replay_actor,replay_reason,trace_parent)
-        VALUES ($1,$2,$3,'pending',$4,1,$5,$6,$6,$6,$7,$8,$9,$10,$11)`,
-		nextID, eventID, endpointID, number+1, maximum, now, input.AttemptID, input.RequestID, input.Actor, input.Reason, telemetry.Parent(ctx))
+         replay_of,replay_request_id,replay_actor,replay_reason,trace_parent,replay_principal_id)
+        VALUES ($1,$2,$3,'pending',$4,1,$5,$6,$6,$6,$7,$8,$9,$10,$11,NULLIF($12,'')::uuid)`,
+		nextID, eventID, endpointID, number+1, maximum, now, input.AttemptID, input.RequestID, input.Actor, input.Reason, telemetry.Parent(ctx), input.PrincipalID)
 	if err != nil {
 		var postgresError *pgconn.PgError
 		if errors.As(err, &postgresError) && postgresError.Code == "23505" {

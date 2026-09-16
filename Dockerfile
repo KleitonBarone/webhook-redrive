@@ -5,7 +5,8 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -trimpath -o /out/api ./cmd/api \
     && CGO_ENABLED=0 go build -trimpath -o /out/worker ./cmd/worker \
-    && CGO_ENABLED=0 go build -trimpath -o /out/receiver ./cmd/receiver
+    && CGO_ENABLED=0 go build -trimpath -o /out/receiver ./cmd/receiver \
+    && CGO_ENABLED=0 go build -trimpath -o /out/admin ./cmd/admin
 
 FROM build AS loadtest-build
 RUN CGO_ENABLED=0 go build -trimpath -o /out/loadtest ./cmd/loadtest
@@ -20,6 +21,7 @@ FROM alpine:3.22 AS api
 RUN adduser -D -u 10001 app
 USER app
 COPY --from=build /out/api /usr/local/bin/api
+COPY --from=build /out/admin /usr/local/bin/admin
 ENTRYPOINT ["api"]
 
 FROM alpine:3.22 AS worker

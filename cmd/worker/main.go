@@ -12,6 +12,7 @@ import (
 	"github.com/KleitonBarone/webhook-redrive/internal/clock"
 	"github.com/KleitonBarone/webhook-redrive/internal/config"
 	"github.com/KleitonBarone/webhook-redrive/internal/delivery"
+	"github.com/KleitonBarone/webhook-redrive/internal/destination"
 	"github.com/KleitonBarone/webhook-redrive/internal/id"
 	"github.com/KleitonBarone/webhook-redrive/internal/logsafe"
 	"github.com/KleitonBarone/webhook-redrive/internal/secret"
@@ -28,6 +29,14 @@ func main() {
 }
 
 func run(logger *slog.Logger) error {
+	policyFile, err := config.Required("DESTINATION_POLICY_FILE")
+	if err != nil {
+		return err
+	}
+	policy, err := destination.Load(policyFile)
+	if err != nil {
+		return err
+	}
 	provider, err := telemetry.Provider("webhook-worker", config.String("TRACE_EXPORTER", "stdout"), os.Stdout)
 	if err != nil {
 		return err
@@ -85,8 +94,9 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	worker, err := delivery.NewWorker(dataStore, box, serviceClock, logger, delivery.Config{
-		Tracer:   provider.Tracer("webhook-redrive"),
-		WorkerID: workerID, Lease: lease, BatchSize: batchSize,
+		Destinations: policy,
+		Tracer:       provider.Tracer("webhook-redrive"),
+		WorkerID:     workerID, Lease: lease, BatchSize: batchSize,
 		PollPeriod: pollPeriod, RequestTimeout: requestTimeout,
 	})
 	if err != nil {

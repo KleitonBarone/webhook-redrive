@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/KleitonBarone/webhook-redrive/internal/clock"
+	"github.com/KleitonBarone/webhook-redrive/internal/destination"
 	"github.com/KleitonBarone/webhook-redrive/internal/retry"
 	"github.com/KleitonBarone/webhook-redrive/internal/secret"
 	"github.com/KleitonBarone/webhook-redrive/internal/signature"
@@ -44,6 +45,7 @@ type Worker struct {
 }
 
 type Config struct {
+	Destinations   *destination.Policy
 	Tracer         trace.Tracer
 	Jitter         func() float64
 	WorkerID       string
@@ -79,6 +81,7 @@ func NewWorker(dataStore attemptStore, box *secret.Box, serviceClock clock.Clock
 		tracer: config.Tracer,
 		jitter: config.Jitter,
 		store:  dataStore, box: box, client: &http.Client{
+			Transport:     config.Destinations.Transport(),
 			Timeout:       config.RequestTimeout,
 			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 		},
@@ -220,6 +223,10 @@ func (w *Worker) deliver(ctx context.Context, attempt store.ClaimedDelivery) (re
 			return ctx.Err()
 		}
 		outcome.Code, outcome.Message = "request_error", "outbound request failed"
+		if errors.Is(err, destination.ErrDenied) {
+			outcome.Code, outcome.Message = "destination_denied", "destination denied by policy"
+			return w.finish(ctx, attempt, outcome)
+		}
 		if errors.Is(err, context.DeadlineExceeded) {
 			outcome.Code, outcome.Message = "timeout", "outbound request timed out"
 		}

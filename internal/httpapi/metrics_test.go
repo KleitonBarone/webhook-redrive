@@ -31,9 +31,9 @@ func (s *metricsStore) Metrics(ctx context.Context, _ time.Time) (store.MetricsS
 
 func TestMetricsExposeBoundedLabelsAndFailClosed(t *testing.T) {
 	s := &metricsStore{}
-	a := New(s, nil, apiClock{now: time.Unix(100, 0)}, discardLogger(), nil)
+	a := New(s, nil, apiClock{now: time.Unix(100, 0)}, discardLogger(), nil, testSecurity(t))
 	response := httptest.NewRecorder()
-	a.ServeHTTP(response, httptest.NewRequest("GET", "/metrics", nil))
+	a.ServeHTTP(response, authenticatedRequest("GET", "/metrics"))
 	if response.Code != 200 {
 		t.Fatalf("metrics: %s", response.Body.String())
 	}
@@ -56,7 +56,7 @@ func TestMetricsExposeBoundedLabelsAndFailClosed(t *testing.T) {
 	}
 	s.fail = true
 	response = httptest.NewRecorder()
-	a.ServeHTTP(response, httptest.NewRequest("GET", "/metrics", nil))
+	a.ServeHTTP(response, authenticatedRequest("GET", "/metrics"))
 	if response.Code != http.StatusServiceUnavailable || strings.Contains(response.Body.String(), "sensitive") {
 		t.Fatalf("failed scrape: %d %s", response.Code, response.Body.String())
 	}

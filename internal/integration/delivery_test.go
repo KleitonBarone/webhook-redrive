@@ -58,8 +58,6 @@ func TestHTTPRetryDeadLetterReplayAndRedaction(t *testing.T) {
 	}
 	var logs lockedBuffer
 	logger := slog.New(logsafe.New(slog.NewJSONHandler(&logs, nil)))
-	api := httptest.NewServer(httpapi.New(s, box, c, logger, nil))
-	defer api.Close()
 	const endpointSecret = "synthetic-secret-never-in-logs"
 	payload := []byte("{\n \"private\":\"payload-never-in-logs\"\n}\n")
 	var mu sync.Mutex
@@ -98,8 +96,12 @@ func TestHTTPRetryDeadLetterReplayAndRedaction(t *testing.T) {
 		w.WriteHeader(204)
 	}))
 	defer receiver.Close()
+	security := testSecurity(t, s, c.now, receiver.URL)
+	api := httptest.NewServer(httpapi.New(s, box, c, logger, nil, security))
+	defer api.Close()
 	worker, err := delivery.NewWorker(s, box, c, logger, delivery.Config{
-		WorkerID: "integration", Lease: 10 * time.Second, RequestTimeout: time.Second,
+		Destinations: security.Destinations,
+		WorkerID:     "integration", Lease: 10 * time.Second, RequestTimeout: time.Second,
 		BatchSize: 10, PollPeriod: time.Millisecond, Jitter: func() float64 { return 0 },
 	})
 	if err != nil {
@@ -117,11 +119,15 @@ func TestHTTPRetryDeadLetterReplayAndRedaction(t *testing.T) {
 			"url": receiver.URL + scenario.path, "secret": endpointSecret, "max_attempts": scenario.max,
 			"concurrency_limit": 1, "rate_limit": 2,
 		}, http.StatusCreated, &endpoint)
+		if endpoint.CreatedBy != "00000000-0000-4000-8000-000000000001" {
+			t.Fatal("endpoint creator is not authenticated principal")
+		}
 		req, err := http.NewRequest(http.MethodPost, api.URL+"/v1/endpoints/"+endpoint.ID+"/events", bytes.NewReader(payload))
 		if err != nil {
 			t.Fatal(err)
 		}
 		req.Header.Set("X-Event-Type", "test.event")
+		req.Header.Set("Authorization", "Bearer "+testToken)
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
 			t.Fatal(err)
@@ -214,6 +220,7 @@ func call(t *testing.T, url, method string, input any, status int, output any) {
 		t.Fatal(err)
 	}
 	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+testToken)
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		t.Fatal(err)
@@ -284,7 +291,8 @@ func TestCrashAfterReceiverAcceptanceRedeliversSameEvent(t *testing.T) {
 	}
 	crash := &lostCompletion{Store: s, lose: true}
 	worker, err := delivery.NewWorker(crash, box, c, slog.New(slog.NewTextHandler(io.Discard, nil)), delivery.Config{
-		WorkerID: "same-worker-id", Lease: 10 * time.Second, RequestTimeout: time.Second, BatchSize: 1, PollPeriod: time.Millisecond,
+		Destinations: testPolicy(t, receiver.URL),
+		WorkerID:     "same-worker-id", Lease: 10 * time.Second, RequestTimeout: time.Second, BatchSize: 1, PollPeriod: time.Millisecond,
 	})
 	if err != nil {
 		t.Fatal(err)

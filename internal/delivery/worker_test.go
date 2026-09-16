@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/KleitonBarone/webhook-redrive/internal/destination"
 	"github.com/KleitonBarone/webhook-redrive/internal/secret"
 	"github.com/KleitonBarone/webhook-redrive/internal/signature"
 	"github.com/KleitonBarone/webhook-redrive/internal/store"
@@ -139,15 +140,38 @@ func TestOutboundRequestTimeoutIsRecorded(t *testing.T) {
 	}
 }
 
-func newTestWorker(t *testing.T, dataStore attemptStore, box *secret.Box, serviceClock fixedClock, timeout time.Duration) *Worker {
+func newTestWorker(t *testing.T, dataStore *fakeAttemptStore, box *secret.Box, serviceClock fixedClock, timeout time.Duration) *Worker {
 	t.Helper()
+	policy, err := destination.New([]destination.Rule{{Origin: dataStore.delivery.EndpointURL, PrivateNetworks: []string{"127.0.0.1/32"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
 	worker, err := NewWorker(dataStore, box, serviceClock, slog.New(slog.NewTextHandler(io.Discard, nil)), Config{
-		WorkerID: "test-worker",
-		Jitter:   func() float64 { return 0 },
-		Lease:    timeout + time.Second, BatchSize: 1, PollPeriod: time.Millisecond, RequestTimeout: timeout,
+		Destinations: policy,
+		WorkerID:     "test-worker",
+		Jitter:       func() float64 { return 0 },
+		Lease:        timeout + time.Second, BatchSize: 1, PollPeriod: time.Millisecond, RequestTimeout: timeout,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return worker
+}
+
+func TestMissingDestinationPolicyRecordsTerminalFailureWithoutSending(t *testing.T) {
+	receiver := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { t.Error("denied request reached receiver") }))
+	defer receiver.Close()
+	box, _ := secret.NewBox(make([]byte, secret.KeySize))
+	encrypted, _ := box.Encrypt([]byte("synthetic-endpoint-secret"))
+	s := &fakeAttemptStore{delivery: store.ClaimedDelivery{EndpointURL: receiver.URL, Payload: []byte("{}"), SecretCiphertext: encrypted}}
+	w, err := NewWorker(s, box, fixedClock{now: time.Unix(100, 0)}, slog.New(slog.NewTextHandler(io.Discard, nil)), Config{WorkerID: "test", Lease: time.Minute, RequestTimeout: time.Second, BatchSize: 1, PollPeriod: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if s.lastOutcome.Code != "destination_denied" || s.lastOutcome.RetryAt != nil || s.lastOutcome.Status != 0 {
+		t.Fatalf("outcome %+v", s.lastOutcome)
+	}
 }

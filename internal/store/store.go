@@ -22,6 +22,7 @@ type Store struct {
 }
 
 type Endpoint struct {
+	CreatedBy        string    `json:"created_by,omitempty"`
 	MaxAttempts      int       `json:"max_attempts"`
 	ConcurrencyLimit int       `json:"concurrency_limit"`
 	RateLimit        int       `json:"rate_limit"`
@@ -39,27 +40,28 @@ type Event struct {
 }
 
 type Attempt struct {
-	TraceParent     string     `json:"trace_parent,omitempty"`
-	AttemptNumber   int        `json:"attempt_number"`
-	CycleAttempt    int        `json:"cycle_attempt"`
-	MaxAttempts     int        `json:"max_attempts"`
-	AvailableAt     time.Time  `json:"available_at"`
-	Retryable       *bool      `json:"retryable,omitempty"`
-	ReplayOf        *string    `json:"replay_of,omitempty"`
-	ReplayRequestID *string    `json:"replay_request_id,omitempty"`
-	ReplayActor     *string    `json:"replay_actor,omitempty"`
-	ReplayReason    *string    `json:"replay_reason,omitempty"`
-	ID              string     `json:"id"`
-	EventID         string     `json:"event_id"`
-	State           string     `json:"state"`
-	ClaimCount      int        `json:"claim_count"`
-	LastStartedAt   *time.Time `json:"last_started_at,omitempty"`
-	CompletedAt     *time.Time `json:"completed_at,omitempty"`
-	ResponseStatus  *int       `json:"response_status,omitempty"`
-	ErrorCode       *string    `json:"error_code,omitempty"`
-	ErrorMessage    *string    `json:"error_message,omitempty"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
+	ReplayPrincipalID *string    `json:"replay_principal_id,omitempty"`
+	TraceParent       string     `json:"trace_parent,omitempty"`
+	AttemptNumber     int        `json:"attempt_number"`
+	CycleAttempt      int        `json:"cycle_attempt"`
+	MaxAttempts       int        `json:"max_attempts"`
+	AvailableAt       time.Time  `json:"available_at"`
+	Retryable         *bool      `json:"retryable,omitempty"`
+	ReplayOf          *string    `json:"replay_of,omitempty"`
+	ReplayRequestID   *string    `json:"replay_request_id,omitempty"`
+	ReplayActor       *string    `json:"replay_actor,omitempty"`
+	ReplayReason      *string    `json:"replay_reason,omitempty"`
+	ID                string     `json:"id"`
+	EventID           string     `json:"event_id"`
+	State             string     `json:"state"`
+	ClaimCount        int        `json:"claim_count"`
+	LastStartedAt     *time.Time `json:"last_started_at,omitempty"`
+	CompletedAt       *time.Time `json:"completed_at,omitempty"`
+	ResponseStatus    *int       `json:"response_status,omitempty"`
+	ErrorCode         *string    `json:"error_code,omitempty"`
+	ErrorMessage      *string    `json:"error_message,omitempty"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
 }
 
 type ClaimedDelivery struct {
@@ -157,10 +159,10 @@ func (s *Store) CreateEndpoint(ctx context.Context, endpoint Endpoint, secretCip
 		endpoint.RateLimit = 10
 	}
 	_, err := s.pool.Exec(ctx, `
-		INSERT INTO webhook_endpoints (id, url, secret_ciphertext, created_at, max_attempts, concurrency_limit, rate_limit)
-		VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+		INSERT INTO webhook_endpoints (id, url, secret_ciphertext, created_at, max_attempts, concurrency_limit, rate_limit, created_by)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,NULLIF($8,'')::uuid)`,
 		endpoint.ID, endpoint.URL, secretCiphertext, endpoint.CreatedAt,
-		endpoint.MaxAttempts, endpoint.ConcurrencyLimit, endpoint.RateLimit)
+		endpoint.MaxAttempts, endpoint.ConcurrencyLimit, endpoint.RateLimit, endpoint.CreatedBy)
 	if err != nil {
 		return fmt.Errorf("insert endpoint: %w", err)
 	}
@@ -225,7 +227,7 @@ func (s *Store) ListAttempts(ctx context.Context, eventID string) ([]Attempt, er
 		SELECT id, event_id, state, claim_count, last_started_at, completed_at,
 		       response_status, error_code, error_message, created_at, updated_at,
 		       attempt_number, cycle_attempt, max_attempts, available_at, retryable,
-		       replay_of, replay_request_id, replay_actor, replay_reason, trace_parent
+		       replay_of, replay_request_id, replay_actor, replay_reason, trace_parent, replay_principal_id
 		FROM delivery_attempts
 		WHERE event_id = $1
 		ORDER BY attempt_number`, eventID)
@@ -259,6 +261,7 @@ func (s *Store) ListAttempts(ctx context.Context, eventID string) ([]Attempt, er
 			&attempt.ReplayActor,
 			&attempt.ReplayReason,
 			&attempt.TraceParent,
+			&attempt.ReplayPrincipalID,
 		); err != nil {
 			return nil, fmt.Errorf("scan attempt: %w", err)
 		}

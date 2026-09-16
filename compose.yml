@@ -32,6 +32,9 @@ services:
     environment:
       DATABASE_URL: postgres://webhook_redrive:local-only-password@postgres:5432/webhook_redrive?sslmode=disable
       MASTER_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      DESTINATION_POLICY_FILE: /config/destinations.json
+    volumes:
+      - ./scripts/demo-destinations.json:/config/destinations.json:ro
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
@@ -43,6 +46,17 @@ services:
       timeout: 2s
       retries: 15
 
+  access-init:
+    image: postgres:17-alpine
+    environment:
+      PGPASSWORD: local-only-password
+    volumes:
+      - ./scripts/demo-access.sql:/demo-access.sql:ro
+    command: ["psql", "-h", "postgres", "-U", "webhook_redrive", "-d", "webhook_redrive", "-v", "ON_ERROR_STOP=1", "-f", "/demo-access.sql"]
+    depends_on:
+      api:
+        condition: service_healthy
+
   worker:
     build:
       context: .
@@ -53,9 +67,14 @@ services:
       OUTBOUND_TIMEOUT: 2s
       CLAIM_LEASE: 10s
       POLL_PERIOD: 250ms
+      DESTINATION_POLICY_FILE: /config/destinations.json
+    volumes:
+      - ./scripts/demo-destinations.json:/config/destinations.json:ro
     depends_on:
       api:
         condition: service_healthy
+      access-init:
+        condition: service_completed_successfully
       receiver:
         condition: service_started
 

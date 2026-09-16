@@ -39,6 +39,7 @@ Shutdown cancels outbound work and leaves incomplete claims for lease recovery. 
 | Other HTTP responses, including redirects | Terminal failed |
 | Timeout, connection failure, temporary DNS failure, connection closed before a response | Retry while budget remains |
 | Permanent DNS failure, invalid destination, certificate failure, secret decryption failure | Terminal failed |
+| Destination denied by deployment policy | Terminal failed without sending HTTP |
 | Retryable failure on the last allowed attempt | Dead letter |
 
 Equal jitter uses a ceiling of `min(1 second * 2^(cycle_attempt - 1), 1 minute)`, then chooses between half and all of that ceiling. A valid `Retry-After` delta or HTTP date increases the wait when it is longer. Past dates and malformed values are ignored; values above 24 hours are capped. The resulting `available_at` is persisted once and does not change on worker restart.
@@ -55,9 +56,15 @@ Workers must use synchronized clocks. No FIFO or cross-event ordering guarantee 
 
 ## Replay audit
 
-`POST /v1/events/{event_id}/replays` requires a current terminal attempt ID, a unique request ID, actor, and reason. It creates a linked attempt and audit fields in one transaction. Identical submissions return the same attempt, including after that attempt succeeds. Changed inputs using the same request ID, active delivery, stale attempt IDs, and already succeeded delivery return HTTP 409.
+`POST /v1/events/{event_id}/replays` requires the `replay` permission, a current terminal attempt ID, a unique request ID, and reason. The server records the authenticated principal ID and its name with the linked attempt in one transaction. Identical submissions by the same principal return the same attempt, including after that attempt succeeds. Credential rotation preserves that identity. Changed inputs or a different principal using the same request ID, active delivery, stale attempt IDs, and already succeeded delivery return HTTP 409.
 
-Replay does not erase the original failure. `GET /v1/dead-letters` lists events whose latest attempt is exhausted; a replay removes the event from that list while preserving its dead-letter row in history. Actor labels are unverified because the local API has no authentication.
+Replay does not erase the original failure. `GET /v1/dead-letters` lists events whose latest attempt is exhausted; a replay removes the event from that list while preserving its dead-letter row in history. Rows created before migration 004 retain unverified actor labels and have no `replay_principal_id`. New API requests reject `actor`; only the authenticated principal supplies attribution.
+
+## Access and destination policy
+
+Ingestion, inspection, registration, replay, and metrics each require their permission. Credential revocation prevents new authenticated requests; it does not cancel already-accepted events or requests authorized before revocation. Permissions are instance-wide.
+
+Every dispatch must pass the worker's deployment-controlled destination policy, including retries, replay, and old endpoints. A rejected destination records `destination_denied` as a terminal failure and does not create a retry. After the policy is corrected and workers restarted, an operator can replay it. DNS and network failures keep the retry classifications above. See [security setup](security.md) for connection-time checks, private-network exceptions, and TLS requirements.
 
 ## Signatures
 

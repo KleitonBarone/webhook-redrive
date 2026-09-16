@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/KleitonBarone/webhook-redrive/internal/auth"
 	"github.com/KleitonBarone/webhook-redrive/internal/id"
 	"github.com/KleitonBarone/webhook-redrive/internal/store"
 	"github.com/KleitonBarone/webhook-redrive/internal/telemetry"
@@ -35,9 +36,11 @@ func (a *API) replay(w http.ResponseWriter, request *http.Request) {
 	if !validID(w, input.AttemptID) || !validID(w, input.RequestID) {
 		return
 	}
-	input.Actor, input.Reason = strings.TrimSpace(input.Actor), strings.TrimSpace(input.Reason)
-	if len(input.Actor) < 1 || len(input.Actor) > 100 || len(input.Reason) < 1 || len(input.Reason) > 500 {
-		writeError(w, http.StatusBadRequest, "actor must be 1..100 bytes and reason 1..500 bytes")
+	principal := auth.FromContext(ctx)
+	input.Actor, input.PrincipalID = principal.Name, principal.ID
+	input.Reason = strings.TrimSpace(input.Reason)
+	if len(input.Reason) < 1 || len(input.Reason) > 500 {
+		writeError(w, http.StatusBadRequest, "reason must be 1..500 bytes")
 		return
 	}
 	result, err := a.store.Replay(request.Context(), eventID, input, a.clock.Now())
