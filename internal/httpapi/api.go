@@ -32,7 +32,7 @@ type dataStore interface {
 	Metrics(context.Context, time.Time) (store.MetricsSnapshot, error)
 	CreateEndpoint(context.Context, store.Endpoint, []byte) error
 	EndpointExists(context.Context, string) (bool, error)
-	CreateEvent(context.Context, store.Event, []byte, string) error
+	IngestEvent(context.Context, store.Event, []byte, string, string, string) (store.IngestionReceipt, error)
 	GetEvent(context.Context, string) (store.Event, error)
 	ListAttempts(context.Context, string) ([]store.Attempt, error)
 	Replay(context.Context, string, store.ReplayRequest, time.Time) (store.ReplayResult, error)
@@ -126,8 +126,14 @@ func (a *API) createEvent(w http.ResponseWriter, request *http.Request) {
 		return
 	}
 	eventType := strings.TrimSpace(request.Header.Get("X-Event-Type"))
-	if eventType == "" || len(eventType) > 100 {
+	if len(request.Header.Values("X-Event-Type")) != 1 || eventType == "" || len(eventType) > 100 {
 		writeError(w, http.StatusBadRequest, "X-Event-Type must contain 1 to 100 characters")
+		return
+	}
+	keys := request.Header.Values("Idempotency-Key")
+	key := request.Header.Get("Idempotency-Key")
+	if len(keys) > 1 || len(keys) == 1 && !store.ValidIdempotencyKey(key) {
+		writeError(w, http.StatusBadRequest, "Idempotency-Key must contain 1..128 ASCII letters, digits, dots, colons, underscores or hyphens")
 		return
 	}
 	payload, err := readPayload(w, request)
@@ -158,13 +164,21 @@ func (a *API) createEvent(w http.ResponseWriter, request *http.Request) {
 		ID: eventID, EndpointID: endpointID, EventType: eventType,
 		State: "pending", CreatedAt: a.clock.Now(),
 	}
-	if err := a.store.CreateEvent(request.Context(), event, payload, attemptID); err != nil {
+	receipt, err := a.store.IngestEvent(ctx, event, payload, attemptID, auth.FromContext(ctx).ID, key)
+	if errors.Is(err, store.ErrIdempotencyConflict) {
+		writeError(w, http.StatusConflict, "idempotency key conflicts with accepted event")
+		return
+	}
+	if err != nil {
 		a.internalError(w, request, "create event", err)
 		return
 	}
-	span.SetAttributes(attribute.String("event.id", eventID), attribute.String("attempt.id", attemptID))
-	a.logger.InfoContext(ctx, "event accepted", "event_id", eventID, "trace_id", telemetry.TraceID(ctx))
-	writeJSON(w, http.StatusAccepted, event)
+	if key != "" {
+		w.Header().Set("Idempotency-Replayed", fmt.Sprint(receipt.Repeated))
+	}
+	span.SetAttributes(attribute.String("event.id", receipt.Event.ID), attribute.String("attempt.id", receipt.AttemptID))
+	a.logger.InfoContext(ctx, "event accepted", "event_id", receipt.Event.ID, "trace_id", telemetry.TraceID(ctx))
+	writeJSON(w, http.StatusAccepted, receipt.Event)
 }
 
 func (a *API) getEvent(w http.ResponseWriter, request *http.Request) {

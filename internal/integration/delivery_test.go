@@ -20,9 +20,9 @@ import (
 	"github.com/KleitonBarone/webhook-redrive/internal/id"
 	"github.com/KleitonBarone/webhook-redrive/internal/logsafe"
 	"github.com/KleitonBarone/webhook-redrive/internal/secret"
-	"github.com/KleitonBarone/webhook-redrive/internal/signature"
 	"github.com/KleitonBarone/webhook-redrive/internal/store"
 	"github.com/KleitonBarone/webhook-redrive/internal/testdb"
+	"github.com/KleitonBarone/webhook-redrive/signature"
 )
 
 type clock struct{ now time.Time }

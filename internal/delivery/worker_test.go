@@ -12,8 +12,8 @@ import (
 
 	"github.com/KleitonBarone/webhook-redrive/internal/destination"
 	"github.com/KleitonBarone/webhook-redrive/internal/secret"
-	"github.com/KleitonBarone/webhook-redrive/internal/signature"
 	"github.com/KleitonBarone/webhook-redrive/internal/store"
+	"github.com/KleitonBarone/webhook-redrive/signature"
 )
 
 type fixedClock struct{ now time.Time }

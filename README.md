@@ -2,7 +2,7 @@
 
 Webhook Redrive accepts events, signs outbound requests, and keeps delivery history in PostgreSQL. It retries temporary failures, retains exhausted deliveries, and supports audited manual replay. One HTTP service and one worker process share one durable database.
 
-Milestones 0 through 4 are implemented. The project targets a small team self-hosting outbound webhook delivery. The local demo includes bearer authentication and an outbound destination policy; it is not a production deployment.
+Milestones 0 through 5 are implemented. The project targets a small team self-hosting outbound webhook delivery. It includes bearer authentication, a destination policy, ingestion idempotency, and producer/receiver reference code. It is not a production deployment.
 
 ## Run the demo
 
@@ -19,6 +19,8 @@ The script verifies two scenarios:
 - A receiver fails three times and the event becomes `dead_letter`. A manual replay succeeds. Submitting the replay request twice creates one attempt, with an actor and reason in history.
 
 All seven deliveries must carry valid signatures and identical body bytes. The script exits with an error if any assertion fails. PostgreSQL, API, and receiver ports bind to loopback only. Stop the stack with `docker compose down`; the database volume remains.
+
+The script also resubmits each event with the same idempotency key and checks that changed payloads return 409. For business-transaction crash recovery, run the [outbox-to-receiver demo](docs/integration.md#run-the-crash-recovery-demo). It proves one database-local business action after a lost API acknowledgement and duplicate webhook delivery.
 
 The demo also proves that an ingestion-only credential cannot replay, unapproved destinations are rejected, and a revoked credential stops working. Compose provisions public synthetic credentials through a one-shot initialization job, not an unauthenticated API. Never use these credentials or the demo master key outside local development.
 
@@ -48,10 +50,13 @@ $endpoint = Invoke-RestMethod -Headers $headers -Method Post -Uri http://localho
 $event = Invoke-RestMethod -Method Post -Uri "http://localhost:8080/v1/endpoints/$($endpoint.id)/events" -ContentType application/json -Headers @{
     "X-Event-Type" = "order.created"
     "Authorization" = "Bearer $env:API_TOKEN"
+    "Idempotency-Key" = "demo-order-42-created"
 } -Body '{"order_id":"demo-42","amount":1250}'
 ```
 
-Registration returns HTTP 201 and never returns the secret. Secrets must contain at least 16 bytes. Ingestion accepts valid JSON up to 1 MiB and returns HTTP 202 after the event and initial attempt commit together. Each ingestion request creates a new event; ingestion does not deduplicate caller requests.
+Registration returns HTTP 201 and never returns the secret. Secrets must contain at least 16 bytes. Ingestion accepts valid JSON up to 1 MiB and returns HTTP 202 after the event and initial attempt commit together.
+
+Optional `Idempotency-Key` values are scoped to the authenticated principal and endpoint. Matching event types and exact body bytes return the original acceptance receipt; conflicting reuse returns 409. Keys have no time-based expiry while history is retained. Without a key, every submission creates a new event. Persist a new key for each business event, and reuse it only when retrying that event. See the [integration contract](docs/integration.md#retry-ingestion-safely).
 
 Endpoint settings are optional and fixed at registration:
 
@@ -93,7 +98,7 @@ API and worker require the same destination-policy file. Compose approves only `
 
 ## Delivery contract
 
-Delivery is at least once. A receiver can process an event before a worker crashes, causing a duplicate after lease recovery. Consumers must deduplicate using `X-Webhook-ID`. Successful processing is not guaranteed when a receiver keeps failing: retries stop at the configured budget.
+Delivery is at least once. A receiver can process an event before a worker crashes, causing a duplicate after lease recovery. Consumers must verify signatures and deduplicate business processing. The v1 signature does not cover `X-Webhook-ID`; use a business identifier inside the signed payload, as the [receiver reference](examples/orders/receiver.go) does. Successful processing is not guaranteed when a receiver keeps failing: retries stop at the configured budget.
 
 HTTP 408, 429, 500, 502, 503, and 504 are retryable. Timeouts and transient network errors are retryable; permanent DNS and certificate failures are terminal. Redirects are not followed. A terminal failure stays `failed`; exhausting retryable failures produces `dead_letter`.
 
@@ -115,7 +120,7 @@ docker compose up -d postgres --wait
 
 ```powershell
 $env:TEST_DATABASE_URL = "postgres://webhook_redrive:local-only-password@localhost:5432/webhook_redrive?sslmode=disable"
-gofmt -w cmd internal migrations
+gofmt -w cmd internal migrations signature examples
 go vet ./...
 go test -race -count=1 ./...
 ```
@@ -130,9 +135,11 @@ Both binaries apply embedded migrations at startup under an advisory lock. To up
 
 Migration 004 adds credentials and principal attribution without rewriting old actor labels. Upgrading clients requires bearer credentials and replay requests without `actor`. Policy changes require restarting API and workers. Load tools require `API_TOKEN`, send it only to the API, and never include it in reports.
 
+Migration 005 adds scoped ingestion keys without changing existing events. The public `signature` package replaces the former internal helper and keeps the v1 wire format. Its request helper rejects duplicate authentication headers and noncanonical timestamps. See [producer and receiver integration](docs/integration.md) for the import path, cross-language test vector, and outbox reference.
+
 ## Next steps
 
-Next is milestone 5: ingestion idempotency, a transactional-outbox example, and reusable receiver verification. Endpoint lifecycle, longer retry horizons, bulk recovery, and long-running operations follow. Fair scheduling remains deferred. Existing [load measurements](docs/benchmarks/sustained/README.md) predate authentication and are not production capacity claims. See [ROADMAP.md](ROADMAP.md).
+Next is milestone 6: endpoint inspection and updates, pause/resume, signing-secret rotation, and outage-oriented retry horizons. Bulk recovery and long-running operations follow. Fair scheduling remains deferred. Existing [load measurements](docs/benchmarks/sustained/README.md) predate authentication and are not production capacity claims. See [ROADMAP.md](ROADMAP.md).
 
 ## License
 

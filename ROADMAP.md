@@ -6,9 +6,9 @@ This roadmap favors a small, explainable delivery system before distributed infr
 
 Target a small engineering team self-hosting outbound webhook delivery. Its application submits JSON events to known destinations; Webhook Redrive handles durable delivery, retries, signatures, and recovery.
 
-Milestones 0 through 4 and the measured follow-ups are complete. The delivery engine now has authenticated access and deployment-controlled destinations, but this is not a production-readiness claim. Endpoint settings are still fixed at registration, and ingestion requests are not deduplicated.
+Milestones 0 through 5 and the measured follow-ups are complete. The delivery engine has authenticated access, deployment-controlled destinations, scoped ingestion idempotency, and producer/receiver reference code. This is not a production-readiness claim. Endpoint settings are still fixed at registration, and data retention remains unbounded.
 
-The next priority is reliable integration with producers and receivers. Work through milestones 5 through 8 in order before further scheduling optimization. Keep one HTTP service, one worker process, and PostgreSQL. These plans do not authorize deployment or access to live systems.
+The next priority is endpoint lifecycle and outage recovery. Work through milestones 6 through 8 in order before further scheduling optimization. Keep one HTTP service, one worker process, and PostgreSQL. These plans do not authorize deployment or access to live systems.
 
 ## 0. Foundation
 
@@ -84,15 +84,19 @@ The authenticated mixed and fairness workloads passed their correctness checks. 
 
 ## 5. Reliable producer and receiver integration
 
-An accepted event is durable today. A business transaction that commits before its application calls our API is not protected by that guarantee.
+Implemented with optional principal-and-endpoint-scoped ingestion keys, an importable signature package, and an order reference that demonstrates a transactional outbox and receiver receipt transaction. See the [integration guide and runnable demo](docs/integration.md) and [decision record](docs/decisions/0006-integration-contract.md). Producers must adopt the outbox pattern to protect the gap before API submission; the delivery service cannot protect a caller's business transaction by itself.
 
-- [ ] Add ingestion idempotency keys with explicit scope, conflict behavior, and a documented deduplication lifetime
-- [ ] Atomically persist the idempotency record, event, and initial attempt; identical retries return the original event
-- [ ] Provide a transactional-outbox reference integration that retries ambiguous API responses using the same key
-- [ ] Publish an importable Go signature-verification package and document the wire format for other languages
-- [ ] Provide a receiver example that verifies signatures and timestamps, then deduplicates processing using an authenticated business identifier
+- [x] Add ingestion idempotency keys with explicit scope, conflict behavior, and a documented deduplication lifetime
+- [x] Atomically persist the idempotency record, event, and initial attempt; identical retries return the original event
+- [x] Provide a transactional-outbox reference integration that retries ambiguous API responses using the same key
+- [x] Publish an importable Go signature-verification package and document the wire format for other languages
+- [x] Provide a receiver example that verifies signatures and timestamps, then deduplicates processing using an authenticated business identifier
 
-Acceptance evidence: concurrent identical submissions and a lost acknowledgement create one event; conflicting key reuse fails. A crash after the example's business transaction commits does not lose its outbound event. Duplicate deliveries do not duplicate the example receiver's business action. Delivery remains at least once, not exactly once.
+Acceptance evidence: PostgreSQL tests cover concurrent identical submissions, atomic rollback at each ingestion insert, exact-byte/type conflicts, scoped keys, credential rotation, and stable receipts after completion and restart. The test-backed demo disconnects an acknowledgement after API acceptance and injects a worker failure after receiver commit. One order produces one event, two deliveries, and one database-local business action. Receiver tests cover concurrent duplicates, receipt/action rollback, restart, signature rejection, and timestamp tolerance. Delivery remains at least once, not exactly once.
+
+Keys and receiver receipts have no automatic expiry in this milestone. Retention policy remains milestone 8 work. The outbox example blocks permanent rejections for operator repair and retries ambiguous responses without changing the key; it is not a new required service or a general-purpose outbox framework.
+
+The [verification record](docs/verification/milestone-5/README.md) includes local checks and raw mixed, fairness, and saturation reports. Those finite unkeyed workloads check delivery compatibility, not keyed-ingestion capacity.
 
 ## 6. Endpoint lifecycle and outage recovery
 

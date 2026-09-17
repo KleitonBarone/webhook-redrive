@@ -74,6 +74,7 @@ func TestTraceSurvivesQueueRetryWorkerRestartAndReplay(t *testing.T) {
 	parent := "00-11111111111111111111111111111111-2222222222222222-01"
 	request, _ := http.NewRequest("POST", api.URL+"/v1/endpoints/"+endpoint.ID+"/events", bytes.NewBufferString(payload))
 	request.Header.Set("X-Event-Type", "synthetic-event-type-no-telemetry")
+	request.Header.Set("Idempotency-Key", "synthetic-idempotency-no-telemetry")
 	request.Header.Set("Authorization", "Bearer "+testToken)
 	request.Header.Set("traceparent", parent)
 	request.Header.Set("tracestate", "vendor=synthetic-tracestate-secret")
@@ -153,7 +154,7 @@ func TestTraceSurvivesQueueRetryWorkerRestartAndReplay(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, private := range []string{"synthetic-payload-no-telemetry", "synthetic-url-token", "synthetic-credential-no-telemetry", "synthetic-event-type-no-telemetry", "synthetic-tracestate-secret", "synthetic-baggage-secret", "synthetic-actor-private", "synthetic-reason-private"} {
+	for _, private := range []string{"synthetic-idempotency-no-telemetry", testToken, "synthetic-payload-no-telemetry", "synthetic-url-token", "synthetic-credential-no-telemetry", "synthetic-event-type-no-telemetry", "synthetic-tracestate-secret", "synthetic-baggage-secret", "synthetic-actor-private", "synthetic-reason-private"} {
 		if bytes.Contains(encoded, []byte(private)) || strings.Contains(logs.String(), private) {
 			t.Fatalf("telemetry leaked %s", private)
 		}

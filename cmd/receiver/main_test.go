@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/KleitonBarone/webhook-redrive/internal/signature"
+	"github.com/KleitonBarone/webhook-redrive/signature"
 )
 
 type fixedClock struct{ now time.Time }

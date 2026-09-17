@@ -16,8 +16,8 @@ import (
 	"github.com/KleitonBarone/webhook-redrive/internal/clock"
 	"github.com/KleitonBarone/webhook-redrive/internal/config"
 	"github.com/KleitonBarone/webhook-redrive/internal/logsafe"
-	"github.com/KleitonBarone/webhook-redrive/internal/signature"
 	"github.com/KleitonBarone/webhook-redrive/internal/telemetry"
+	"github.com/KleitonBarone/webhook-redrive/signature"
 )
 
 const maxReceiverBody = 1 << 20
@@ -93,14 +93,7 @@ func (r *receiver) deliver(status int, delay time.Duration) http.HandlerFunc {
 			return
 		}
 		now := r.clock.Now()
-		verificationErr := signature.Verify(
-			r.secret,
-			request.Header.Get("X-Webhook-Timestamp"),
-			body,
-			request.Header.Get("X-Webhook-Signature"),
-			now,
-			r.tolerance,
-		)
+		verificationErr := signature.VerifyRequest(r.secret, request, body, now, r.tolerance)
 		digest := sha256.Sum256(body)
 		delivery := receivedDelivery{
 			TraceID:        telemetry.TraceID(ctx),

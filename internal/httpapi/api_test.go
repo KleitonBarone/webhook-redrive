@@ -50,11 +50,11 @@ func (s *fakeStore) CreateEndpoint(_ context.Context, endpoint store.Endpoint, c
 
 func (s *fakeStore) EndpointExists(context.Context, string) (bool, error) { return true, nil }
 
-func (s *fakeStore) CreateEvent(_ context.Context, event store.Event, payload []byte, attemptID string) error {
+func (s *fakeStore) IngestEvent(_ context.Context, event store.Event, payload []byte, attemptID, principalID, key string) (store.IngestionReceipt, error) {
 	s.event = event
 	s.payload = append([]byte(nil), payload...)
 	s.attemptID = attemptID
-	return nil
+	return store.IngestionReceipt{Event: event, AttemptID: attemptID}, nil
 }
 
 func (s *fakeStore) GetEvent(context.Context, string) (store.Event, error) {

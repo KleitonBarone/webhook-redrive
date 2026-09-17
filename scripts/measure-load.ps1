@@ -13,7 +13,7 @@ $repo = Split-Path $PSScriptRoot -Parent
 Set-Location $repo
 $revision = (git rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0) { throw 'Cannot identify source revision' }
-if (git status --porcelain -- cmd internal migrations Dockerfile compose.yml compose.benchmark.yml scripts) {
+if (git status --porcelain -- cmd internal migrations signature examples Dockerfile compose.yml compose.benchmark.yml scripts) {
     $revision += '-dirty'
 }
 $project = 'webhook-measure-' + [guid]::NewGuid().ToString('N').Substring(0,12)

@@ -34,10 +34,20 @@ function Send-DemoEvent([int]$Failures) {
         concurrency_limit = 1
         rate_limit = 5
     } | ConvertTo-Json)
-    Invoke-RestMethod -Method Post -Uri "$BaseUrl/v1/endpoints/$($endpoint.id)/events" -ContentType application/json -Headers @{
+    $ingestHeaders = @{
         "X-Event-Type" = "demo.order"
         "Authorization" = "Bearer $ApiToken"
-    } -Body '{"order_id":"demo-42","amount":1250}'
+        "Idempotency-Key" = [guid]::NewGuid().ToString()
+    }
+    $body = '{"order_id":"demo-42","amount":1250}'
+    $accepted = Invoke-WebRequest -Method Post -Uri "$BaseUrl/v1/endpoints/$($endpoint.id)/events" -ContentType application/json -Headers $ingestHeaders -Body $body
+    $repeated = Invoke-WebRequest -Method Post -Uri "$BaseUrl/v1/endpoints/$($endpoint.id)/events" -ContentType application/json -Headers $ingestHeaders -Body $body
+    if ($accepted.StatusCode -ne 202 -or $accepted.Headers['Idempotency-Replayed'] -ne 'false' -or $repeated.Headers['Idempotency-Replayed'] -ne 'true' -or $accepted.Content -ne $repeated.Content) {
+        throw 'Ingestion retry did not return the original acceptance receipt.'
+    }
+    $conflict = Invoke-WebRequest -SkipHttpErrorCheck -Method Post -Uri "$BaseUrl/v1/endpoints/$($endpoint.id)/events" -ContentType application/json -Headers $ingestHeaders -Body '{"order_id":"changed","amount":1250}'
+    if ($conflict.StatusCode -ne 409) { throw 'Conflicting ingestion key was accepted.' }
+    $accepted.Content | ConvertFrom-Json
 }
 
 function Wait-ForState([string]$EventId, [string]$Expected) {
@@ -114,4 +124,4 @@ if ($probe.StatusCode -ne 401) { throw 'Revoked credential was accepted.' }
     [pscustomobject]@{ scenario = "retry recovery"; event_id = $eventual.id; state = "succeeded"; attempts = 3 }
     [pscustomobject]@{ scenario = "dead letter then replay"; event_id = $exhausted.id; state = "succeeded"; attempts = 4 }
 ) | Format-Table -AutoSize
-Write-Output "Verified seven signed deliveries, unchanged bytes, traces, metrics, authenticated replay, permission denial, destination rejection, and credential revocation."
+Write-Output "Verified idempotent ingestion, key conflicts, seven signed deliveries, unchanged bytes, traces, metrics, authenticated replay, permission denial, destination rejection, and credential revocation."

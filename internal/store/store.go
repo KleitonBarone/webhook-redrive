@@ -177,6 +177,13 @@ func (s *Store) CreateEvent(ctx context.Context, event Event, payload []byte, at
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	if err := insertEvent(ctx, tx, event, payload, attemptID); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+func insertEvent(ctx context.Context, tx pgx.Tx, event Event, payload []byte, attemptID string) error {
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO events (id, endpoint_id, event_type, payload, created_at)
 		VALUES ($1, $2, $3, $4, $5)`, event.ID, event.EndpointID, event.EventType, payload, event.CreatedAt); err != nil {
@@ -187,9 +194,6 @@ func (s *Store) CreateEvent(ctx context.Context, event Event, payload []byte, at
 			id, event_id, state, available_at, created_at, updated_at, endpoint_id, max_attempts, trace_parent
 		) SELECT $1, $2, 'pending', $3, $3, $3, id, max_attempts, $5 FROM webhook_endpoints WHERE id=$4`, attemptID, event.ID, event.CreatedAt, event.EndpointID, telemetry.Parent(ctx)); err != nil {
 		return fmt.Errorf("insert delivery attempt: %w", err)
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit event ingestion: %w", err)
 	}
 	return nil
 }

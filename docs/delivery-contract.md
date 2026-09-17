@@ -22,7 +22,9 @@ The event's current state is the latest attempt's state. Intermediate failed row
 
 ## Persistence and crashes
 
-Ingestion commits the event and initial attempt together. Claiming commits an unexpired lease and reserves endpoint limits before sending. No transaction remains open across HTTP dispatch.
+Ingestion commits the event and initial attempt together. With `Idempotency-Key`, the scoped key reservation commits in that same transaction. Identical submissions under the same principal and endpoint return the original acceptance receipt, even after delivery completes. Conflicting bytes or event type return 409. Keys have no expiry while history is retained; submissions without a key still create new events. See [producer integration](integration.md) for the exact contract and transactional-outbox example.
+
+Claiming commits an unexpired lease and reserves endpoint limits before sending. No transaction remains open across HTTP dispatch.
 
 Completion commits the outcome and any scheduled retry together. If the worker crashes or the completion transaction fails, the lease expires and the same attempt is eligible again. If the receiver already accepted that request, recovery produces a duplicate. A completion from an old generation cannot update a reclaimed row or schedule another retry, even with the same worker ID.
 
@@ -72,4 +74,4 @@ Each request carries `X-Webhook-ID`, `X-Webhook-Event`, `X-Webhook-Timestamp` as
 
 The signed message is `timestamp + "." + exact HTTP body bytes`. The timestamp changes on later sends. The event ID and event type headers are not included in this signature format; consumers requiring an authenticated business identifier should include it in the payload. Consumers should verify the HMAC and timestamp before processing.
 
-The `internal/signature.Verify` helper uses constant-time comparison and rejects timestamps outside the supplied tolerance in either direction. The synthetic receiver uses five minutes. Timestamp verification does not replace receiver-side deduplication.
+The public `signature.Verify` helper uses constant-time comparison and rejects timestamps outside the supplied tolerance in either direction. `signature.VerifyRequest` also rejects duplicate timestamp/signature headers. The synthetic receiver uses five minutes. Timestamp verification does not replace receiver-side deduplication. The [order receiver](../examples/orders/receiver.go) atomically commits its receipt and business action using an identifier inside the verified body.

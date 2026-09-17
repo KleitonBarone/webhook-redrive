@@ -43,7 +43,7 @@ func (h *Handler) WithGroup(name string) slog.Handler {
 
 func scrub(attr slog.Attr) slog.Attr {
 	key := strings.ToLower(attr.Key)
-	for _, sensitive := range []string{"payload", "secret", "authorization", "signature", "credential", "token"} {
+	for _, sensitive := range []string{"payload", "secret", "authorization", "signature", "credential", "token", "idempotency"} {
 		if strings.Contains(key, sensitive) {
 			return slog.String(attr.Key, redacted)
 		}
