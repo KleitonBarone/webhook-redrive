@@ -4,7 +4,7 @@
 
 Webhook Redrive is a reliable webhook delivery service. The hard parts are delivery state, retries, duplicate handling, signatures, and enough telemetry to explain every attempt.
 
-Read `README.md` and `ROADMAP.md` before changing scope. Milestones 0 through 5 are implemented. Local load evidence is in `docs/benchmarks/README.md`; it predates authentication and is not production capacity.
+Read `README.md` and `ROADMAP.md` before changing scope. Milestones 0 through 6 are implemented. Local load evidence is in `docs/benchmarks/README.md`; it predates authentication and is not production capacity.
 
 ## Product rules
 
@@ -21,6 +21,7 @@ Read `README.md` and `ROADMAP.md` before changing scope. Milestones 0 through 5 
 - Read `docs/decisions/0005-access-and-destinations.md` before changing credentials or outbound HTTP. Preserve connection-time address checks, literal-IP dialing, TLS hostname verification, and disabled proxies/redirects. Keep policy immutable for each connection pool.
 - Read `docs/decisions/0006-integration-contract.md` before changing ingestion identity or signature verification. Reserve keyed ingestion atomically with event and attempt, scope it to principal and endpoint, and preserve exact-byte conflict checks. Do not expire keys independently of retained history or put keys in telemetry.
 - The public `signature` package is the shared wire implementation. Keep v1 compatibility; metadata headers are unsigned. Receiver business deduplication must use an identifier inside the verified body and commit its receipt with the business action.
+- Read `docs/decisions/0007-endpoint-lifecycle.md` before changing endpoint lifecycle or expiration. Share the endpoint claim lock, commit versioned edits with authenticated audit, and preserve per-cycle retry/deadline snapshots. Pause does not cancel existing claims or stop expiration. Retirement must wait for old live claims; it is not emergency revocation.
 
 ## Keep the first system small
 
@@ -51,6 +52,8 @@ PostgreSQL integration tests require `TEST_DATABASE_URL`. Start the local databa
 Run `pwsh -File scripts/demo.ps1` against the local Compose stack to verify retry recovery, dead-letter exhaustion, authenticated replay, signatures, unchanged payload bytes, permission denial, destination rejection, and revocation. Pass `-ComposeProject <name>` for an isolated project and `-WSLDistro Ubuntu` when Docker runs in WSL. Read `docs/decisions/0002-failure-handling.md` before changing retry budgets, claim locking, or replay semantics.
 
 The demo also checks repeated ingestion receipts and key conflicts. With `TEST_DATABASE_URL`, run `go test -race -count=1 -v ./internal/integration -run '^TestOutboxToReceiverDemo$'` for producer restart, lost API acknowledgement, and duplicate receiver processing. These are commit-boundary fault injections, not OS process-kill tests.
+
+The Compose demo checks pause/resume and endpoint audit. Run `go test -race -count=1 -v ./internal/integration -run '^TestEndpointLifecycleDemo$'` for signing overlap, queued configuration changes, prolonged outage, restart, expiration, and explicit recovery. It uses a controllable clock, not elapsed-hour sleeps. Keep `retry_profile: demo` explicit in local load/demo registration.
 
 Set `API_TOKEN` to the synthetic Compose credential documented in README before running `go run ./cmd/loadtest -scenario mixed -events 40` and `go run ./cmd/loadtest -scenario fairness -events 40` on an isolated idle local stack. Publish real JSON results with their revision and environment; do not turn shared-runner timing into performance assertions.
 

@@ -38,8 +38,8 @@ Each claim generation gets its own queue/delivery spans, including crash recover
 
 | Metric | Meaning |
 | --- | --- |
-| `webhook_queue_depth{state}` | Pending `ready` or `scheduled` work, active `in_progress` claims, and `expired` leases |
-| `webhook_oldest_ready_seconds` | Time since the oldest pending attempt became due, or the oldest lease expired |
+| `webhook_queue_depth{state}` | Pending `ready` or `scheduled` work, active `in_progress` claims, `expired` leases, and `paused` queued work |
+| `webhook_oldest_ready_seconds` | Time since the oldest unpaused pending attempt became due, or its lease expired |
 | `webhook_events{state}` | Current event states based on each event's latest attempt |
 | `webhook_events_accepted_total` | Committed events |
 | `webhook_claims_total` | All committed claims, including claims that never send HTTP |
@@ -50,7 +50,7 @@ Each claim generation gets its own queue/delivery spans, including crash recover
 | `webhook_attempt_duration_seconds` | Histogram from last claim to completion timestamp, for completed attempts |
 | `webhook_queue_duration_seconds` | Histogram from scheduled availability to last claim, for completed attempts |
 
-`ready` describes time eligibility, not whether endpoint concurrency or rate permits are available. Gauges can move in either direction. Counters and histograms persist across process restarts because they derive from retained database rows. They are not safe against deleting that history; retention is not implemented.
+`ready` describes time eligibility on an unpaused endpoint, not whether concurrency or rate permits are available. `paused` counts pending attempts and expired leases on paused endpoints; live leases remain `in_progress`. Terminal cycle expiration counts as a `dead_letter` outcome, not an `expired` queue entry. Before a worker sweeps expiration, a past-deadline pending row can still appear in its pending queue category but cannot be dispatched. Gauges can move in either direction. Counters and histograms persist across process restarts because they derive from retained database rows. They are not safe against deleting that history; retention is not implemented.
 
 The latency histograms include application work, not just HTTP latency. Completion timestamps are captured before the completion transaction, so its commit latency is excluded. They exclude unresolved claims and old rows without start/completion timestamps. The queue histogram excludes planned backoff and includes crash recovery delay. Histogram buckets are 5 ms, 25 ms, 100 ms, 500 ms, 1 s, 2 s, 5 s, 10 s, 30 s, 60 s, and infinity. Negative durations from clock skew are clamped to zero; synchronize worker clocks.
 

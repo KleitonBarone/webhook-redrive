@@ -63,6 +63,8 @@ err := signature.VerifyRequest(secret, request, body, time.Now(), 5*time.Minute)
 
 Reject errors before parsing or acting on the body. `VerifyRequest` requires exactly one `X-Webhook-Timestamp` and `X-Webhook-Signature` value. `Verify` accepts those values directly. Both use constant-time MAC comparison and accept timestamps at either tolerance boundary. Negative tolerances, noncanonical decimal timestamps, malformed signatures, and mismatches fail verification. The caller supplies the current time and tolerance.
 
+For planned signing-key rotation, `VerifyRequestKeys` accepts one or two keys, each at least 16 bytes. Install the new key in receivers before switching the sender, then retire the old key using the [overlap procedure](endpoints.md#rotate-a-signing-secret). `examples/orders.ReceiverWithKeys` captures a key ring when the handler is built; replace the handler instead of mutating that ring.
+
 The wire format is unchanged:
 
 1. `X-Webhook-Timestamp` is canonical decimal Unix seconds.

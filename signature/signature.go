@@ -62,3 +62,28 @@ func VerifyRequest(secret []byte, request *http.Request, body []byte, now time.T
 	}
 	return Verify(secret, request.Header.Get("X-Webhook-Timestamp"), body, request.Header.Get("X-Webhook-Signature"), now, tolerance)
 }
+
+// VerifyRequestKeys accepts one or two receiver-managed keys during rotation.
+// Install the new key before rotating the sender; remove the old key only after
+// retirement and the receiver's timestamp tolerance have elapsed.
+func VerifyRequestKeys(keys [][]byte, request *http.Request, body []byte, now time.Time, tolerance time.Duration) error {
+	if len(keys) < 1 || len(keys) > 2 {
+		return ErrInvalidSignature
+	}
+	for _, key := range keys {
+		if len(key) < 16 {
+			return ErrInvalidSignature
+		}
+	}
+	result := ErrInvalidSignature
+	for _, key := range keys {
+		err := VerifyRequest(key, request, body, now, tolerance)
+		if err == nil {
+			return nil
+		}
+		if errors.Is(err, ErrStaleTimestamp) {
+			result = ErrStaleTimestamp
+		}
+	}
+	return result
+}

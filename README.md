@@ -2,7 +2,7 @@
 
 Webhook Redrive accepts events, signs outbound requests, and keeps delivery history in PostgreSQL. It retries temporary failures, retains exhausted deliveries, and supports audited manual replay. One HTTP service and one worker process share one durable database.
 
-Milestones 0 through 5 are implemented. The project targets a small team self-hosting outbound webhook delivery. It includes bearer authentication, a destination policy, ingestion idempotency, and producer/receiver reference code. It is not a production deployment.
+Milestones 0 through 6 are implemented. The project targets a small team self-hosting outbound webhook delivery. It includes controlled access, ingestion idempotency, audited endpoint maintenance, signing-key rotation, and bounded outage recovery. It is not a production deployment.
 
 ## Run the demo
 
@@ -21,6 +21,8 @@ The script verifies two scenarios:
 All seven deliveries must carry valid signatures and identical body bytes. The script exits with an error if any assertion fails. PostgreSQL, API, and receiver ports bind to loopback only. Stop the stack with `docker compose down`; the database volume remains.
 
 The script also resubmits each event with the same idempotency key and checks that changed payloads return 409. For business-transaction crash recovery, run the [outbox-to-receiver demo](docs/integration.md#run-the-crash-recovery-demo). It proves one database-local business action after a lost API acknowledgement and duplicate webhook delivery.
+
+It pauses endpoints before ingestion, resumes their queued work, and checks authenticated configuration audit entries. The [lifecycle demo](docs/endpoints.md#run-the-lifecycle-demo) separately exercises signing-key rotation and hours of outage recovery using a controllable clock.
 
 The demo also proves that an ingestion-only credential cannot replay, unapproved destinations are rejected, and a revoked credential stops working. Compose provisions public synthetic credentials through a one-shot initialization job, not an unauthenticated API. Never use these credentials or the demo master key outside local development.
 
@@ -42,6 +44,7 @@ $headers = @{ Authorization = "Bearer $env:API_TOKEN" }
 $endpoint = Invoke-RestMethod -Headers $headers -Method Post -Uri http://localhost:8080/v1/endpoints -ContentType application/json -Body (@{
     url = "http://receiver:9090/flaky?failures=2"
     secret = "local-demo-secret-32-bytes-long"
+    retry_profile = "demo"
     max_attempts = 5
     concurrency_limit = 2
     rate_limit = 10
@@ -58,13 +61,15 @@ Registration returns HTTP 201 and never returns the secret. Secrets must contain
 
 Optional `Idempotency-Key` values are scoped to the authenticated principal and endpoint. Matching event types and exact body bytes return the original acceptance receipt; conflicting reuse returns 409. Keys have no time-based expiry while history is retained. Without a key, every submission creates a new event. Persist a new key for each business event, and reuse it only when retrying that event. See the [integration contract](docs/integration.md#retry-ingestion-safely).
 
-Endpoint settings are optional and fixed at registration:
+Endpoint settings are optional at registration. The short `demo` profile remains the compatibility default; select `retry_profile: "outage"` for a twenty-attempt policy with a five-minute base, two-hour cap, and 24-hour lifetime. Both profiles support bounded overrides. [Endpoint maintenance](docs/endpoints.md) documents all settings, listing, inspection, version-checked updates, pause/resume, and signing-key rotation.
 
 | Setting | Default | Range | Meaning |
 | --- | --- | --- | --- |
 | `max_attempts` | 5 | 1..20 | Logical attempts per delivery cycle, including the first |
 | `concurrency_limit` | 2 | 1..100 | Unexpired claims across all workers |
 | `rate_limit` | 10 | 1..1000 | Claims per one-second fixed window across all workers |
+
+New cycles snapshot their retry timing, budget, and deadline. Destination and signing changes apply at the next claim; already-claimed requests may finish using the old configuration. Paused endpoints still accept ingestion, but queued work waits and can expire. Configuration changes commit with authenticated audit entries and never return signing secrets.
 
 Inspect delivery progress:
 
@@ -88,11 +93,11 @@ $replay = @{
 Invoke-RestMethod -Headers $headers -Method Post -Uri "http://localhost:8080/v1/events/$($event.id)/replays" -ContentType application/json -Body $replay
 ```
 
-Replay requires the current `failed` or `dead_letter` attempt. It preserves the event ID, payload, and old history, and starts a new retry cycle. Repeat the same request body under the same principal after an ambiguous API response; it returns the original replay attempt. Conflicting inputs or a stale attempt ID return HTTP 409. The server records the authenticated principal and rejects caller-supplied `actor` fields. Legacy history without `replay_principal_id` remains unverified.
+Replay requires the current `failed` or `dead_letter` attempt. It preserves the event ID, payload, and old history, and starts a new retry cycle using current endpoint policy and a fresh deadline. Repeat the same request body under the same principal after an ambiguous API response; it returns the original replay attempt without renewing its deadline. Conflicting inputs or a stale attempt ID return HTTP 409. The server records the authenticated principal and rejects caller-supplied `actor` fields. Legacy history without `replay_principal_id` remains unverified.
 
 ## Access and approved destinations
 
-Every API operation except `/healthz` requires a bearer credential. Fixed permissions cover ingestion, inspection, endpoint registration, replay, and metrics. Permissions are instance-wide, not tenant or endpoint isolation. PostgreSQL stores credential hashes and revocation state; `cmd/admin` provisions and revokes credentials using database access.
+Every API operation except `/healthz` requires a bearer credential. Fixed permissions cover ingestion, inspection, endpoint administration, replay, and metrics. Permissions are instance-wide, not tenant or endpoint isolation. PostgreSQL stores credential hashes and revocation state; `cmd/admin` provisions and revokes credentials using database access.
 
 API and worker require the same destination-policy file. Compose approves only `http://receiver:9090` with explicit Docker private-network exceptions. The worker checks resolved addresses at connection time, refuses redirects and environment proxies, and records a terminal `destination_denied` failure for blocked destinations. See [security setup](docs/security.md) for credential commands, TLS requirements, policy examples, and upgrade instructions.
 
@@ -102,7 +107,7 @@ Delivery is at least once. A receiver can process an event before a worker crash
 
 HTTP 408, 429, 500, 502, 503, and 504 are retryable. Timeouts and transient network errors are retryable; permanent DNS and certificate failures are terminal. Redirects are not followed. A terminal failure stays `failed`; exhausting retryable failures produces `dead_letter`.
 
-Backoff doubles from a one-second ceiling to a one-minute ceiling. Equal jitter chooses between half and all of that ceiling. A longer valid `Retry-After` takes precedence, capped at 24 hours.
+Backoff doubles from the snapshotted base to its cap. Equal jitter chooses between half and all of that ceiling. A longer valid `Retry-After` takes precedence, capped at 24 hours and the remaining cycle lifetime. Expiration produces `dead_letter` with `event_expired`, without deleting history. A request begun before expiration can still succeed within its timeout and lease. [Retry horizons](docs/endpoints.md#choose-a-retry-horizon) explain the bounds and migration exceptions.
 
 Endpoint limits count leased work and claim starts, not remote processing. A crash after sending may leave remote work running after the local lease expires. Crash recovery reclaims the same logical attempt and can exceed the configured number of wire requests. Fixed rate windows allow bursts across a window boundary. Workers need synchronized clocks, and delivery order is not guaranteed.
 
@@ -137,9 +142,11 @@ Migration 004 adds credentials and principal attribution without rewriting old a
 
 Migration 005 adds scoped ingestion keys without changing existing events. The public `signature` package replaces the former internal helper and keeps the v1 wire format. Its request helper rejects duplicate authentication headers and noncanonical timestamps. See [producer and receiver integration](docs/integration.md) for the import path, cross-language test vector, and outbox reference.
 
+Migration 006 adds endpoint versions, configuration audit, rotation metadata, and retry-policy snapshots. Existing cycles keep their former policy and no retroactive deadline; new ingestion and explicit replay receive finite deadlines. Upgrade all API/worker binaries together. [Lifecycle decisions](docs/decisions/0007-endpoint-lifecycle.md) define claim boundaries, rotation overlap, and compatibility.
+
 ## Next steps
 
-Next is milestone 6: endpoint inspection and updates, pause/resume, signing-secret rotation, and outage-oriented retry horizons. Bulk recovery and long-running operations follow. Fair scheduling remains deferred. Existing [load measurements](docs/benchmarks/sustained/README.md) predate authentication and are not production capacity claims. See [ROADMAP.md](ROADMAP.md).
+Next is milestone 7: event search, investigation details, and bounded, resumable bulk replay. Retention and long-running recovery operations follow. Fair scheduling remains deferred. Existing [load measurements](docs/benchmarks/sustained/README.md) predate authentication and are not production capacity claims. See [ROADMAP.md](ROADMAP.md).
 
 ## License
 

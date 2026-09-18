@@ -17,6 +17,14 @@ func TestEveryProtectedRouteRequiresItsPermission(t *testing.T) {
 	uuid := "7d178c7d-cbdd-4e47-a158-69e2f5c89770"
 	routes := []struct{ method, path, permission string }{
 		{"POST", "/v1/endpoints", auth.Endpoints},
+		{"GET", "/v1/endpoints", auth.Inspect},
+		{"GET", "/v1/endpoints/" + uuid, auth.Inspect},
+		{"GET", "/v1/endpoints/" + uuid + "/audit", auth.Inspect},
+		{"PUT", "/v1/endpoints/" + uuid, auth.Endpoints},
+		{"POST", "/v1/endpoints/" + uuid + "/pause", auth.Endpoints},
+		{"POST", "/v1/endpoints/" + uuid + "/resume", auth.Endpoints},
+		{"POST", "/v1/endpoints/" + uuid + "/secret-rotations", auth.Endpoints},
+		{"POST", "/v1/endpoints/" + uuid + "/secret-retirement", auth.Endpoints},
 		{"POST", "/v1/endpoints/" + uuid + "/events", auth.Ingest},
 		{"GET", "/v1/events/" + uuid, auth.Inspect},
 		{"GET", "/v1/events/" + uuid + "/attempts", auth.Inspect},

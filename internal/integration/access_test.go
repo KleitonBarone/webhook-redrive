@@ -104,13 +104,17 @@ func TestHTTPReplaySurvivesCredentialRotationAndRejectsRevocation(t *testing.T) 
 }
 
 func testSecurity(t *testing.T, s *store.Store, now time.Time, origin string) httpapi.Security {
+	return testSecurityFor(t, s, now, origin, time.Hour)
+}
+
+func testSecurityFor(t *testing.T, s *store.Store, now time.Time, origin string, lifetime time.Duration) httpapi.Security {
 	t.Helper()
 	p := auth.Principal{ID: "00000000-0000-4000-8000-000000000001", Name: "synthetic-actor-private", Kind: "operator", Permissions: []string{auth.Ingest, auth.Inspect, auth.Endpoints, auth.Replay, auth.Metrics}}
 	if err := s.CreatePrincipal(context.Background(), p, now); err != nil {
 		t.Fatal(err)
 	}
 	hash, _ := auth.Hash(testToken)
-	if err := s.IssueCredential(context.Background(), p.ID, "00000000-0000-4000-8000-000000000002", hash, now, now.Add(time.Hour)); err != nil {
+	if err := s.IssueCredential(context.Background(), p.ID, "00000000-0000-4000-8000-000000000002", hash, now, now.Add(lifetime)); err != nil {
 		t.Fatal(err)
 	}
 	return httpapi.Security{Authenticator: s, Destinations: testPolicy(t, origin)}

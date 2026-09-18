@@ -1,6 +1,6 @@
 # Delivery contract
 
-The system persists delivery intent before dispatch and permits duplicate delivery. It does not promise exactly-once processing or eventual receiver success after the retry budget is exhausted.
+The system persists delivery intent before dispatch and permits duplicate delivery. It does not promise exactly-once processing or eventual receiver success after the retry budget or cycle lifetime is exhausted.
 
 ## State transitions
 
@@ -12,9 +12,10 @@ pending -> in_progress -> succeeded
                   |
                   +-> failed, terminal error
                   |
-                  +-> dead_letter, retry budget exhausted
+                  +-> dead_letter, retry budget or cycle lifetime exhausted
 
-expired in_progress lease -> same attempt under a new claim generation
+pending or expired lease past cycle deadline -> dead_letter, event_expired
+expired in_progress lease before deadline -> same attempt under a new claim generation
 terminal failed/dead_letter -> manual replay creates a new pending attempt
 ```
 
@@ -26,7 +27,7 @@ Ingestion commits the event and initial attempt together. With `Idempotency-Key`
 
 Claiming commits an unexpired lease and reserves endpoint limits before sending. No transaction remains open across HTTP dispatch.
 
-Completion commits the outcome and any scheduled retry together. If the worker crashes or the completion transaction fails, the lease expires and the same attempt is eligible again. If the receiver already accepted that request, recovery produces a duplicate. A completion from an old generation cannot update a reclaimed row or schedule another retry, even with the same worker ID.
+Completion commits the outcome and any scheduled retry together. If the worker crashes or the completion transaction fails, the lease expires and the same attempt is eligible again while the endpoint is unpaused and the cycle deadline has not passed. If the receiver already accepted that request, recovery produces a duplicate. A completion from an old generation cannot update a reclaimed row or schedule another retry, even with the same worker ID.
 
 `claim_count` records recoveries, while `attempt_number` orders logical attempts. Retry budgets count logical attempts, including the initial attempt, within a cycle. They do not cap ambiguous transmissions after crashes. A successful HTTP response means receipt of a 2xx response header; response bodies are ignored.
 
@@ -44,9 +45,13 @@ Shutdown cancels outbound work and leaves incomplete claims for lease recovery. 
 | Destination denied by deployment policy | Terminal failed without sending HTTP |
 | Retryable failure on the last allowed attempt | Dead letter |
 
-Equal jitter uses a ceiling of `min(1 second * 2^(cycle_attempt - 1), 1 minute)`, then chooses between half and all of that ceiling. A valid `Retry-After` delta or HTTP date increases the wait when it is longer. Past dates and malformed values are ignored; values above 24 hours are capped. The resulting `available_at` is persisted once and does not change on worker restart.
+Equal jitter uses a ceiling of `min(retry_base_seconds * 2^(cycle_attempt - 1), retry_cap_seconds)`, then chooses between half and all of that ceiling. A valid `Retry-After` delta or HTTP date increases the wait when it is longer. Past dates and malformed values are ignored; values above 24 hours are capped. The resulting `available_at` is bounded by the cycle deadline, persisted once, and unchanged on restart.
 
-The endpoint's `max_attempts` is copied into each attempt. A replay begins at `cycle_attempt=1` with that budget. Event payloads and IDs are immutable through retries and replay.
+Ingestion snapshots the endpoint's `max_attempts`, retry delays, and `expires_at = accepted time + event_ttl_seconds`. Retries inherit them. Explicit replay begins at `cycle_attempt=1` with current endpoint policy and a fresh deadline. Event payloads and IDs are immutable. Duplicate replay submissions do not reset the deadline. Pre-migration-006 cycles have no retroactive deadline; their retry budgets still apply.
+
+Expiration terminalizes at most 1,000 eligible attempts per claim transaction, even on paused endpoints. It never overwrites a live lease. A request started before expiration can still succeed within its timeout and lease, but a failure cannot extend the cycle. Expiration does not delete history, prove a previous ambiguous request was unprocessed, or release an ingestion key. Visible terminal state can lag while workers are stopped or saturated.
+
+The compatibility `demo` profile uses a one-second base and one-minute cap. The opt-in `outage` profile uses a five-minute base, two-hour cap, twenty attempts, and 24-hour lifetime. See [retry horizons](endpoints.md#choose-a-retry-horizon) for override bounds and delay calculations.
 
 ## Endpoint limits
 
@@ -56,15 +61,21 @@ A rate window lasts one second from the first claim in that window. Up to `rate_
 
 Workers must use synchronized clocks. No FIFO or cross-event ordering guarantee exists.
 
+## Endpoint changes and pause
+
+Version-checked updates commit with authenticated configuration audit under the endpoint claim lock. Destination and signing changes apply to the next claim, including queued retries, recovery, and replay. Existing claims retain their captured configuration. Attempts expose the endpoint and signing versions of the last claim; historical completed attempts are not rewritten. Delivery settings do not retroactively change cycle snapshots.
+
+Pause blocks new claims but still permits durable ingestion and replay. Already-claimed requests can finish; deadlines keep advancing. Resume preserves intent and history. Reducing endpoint limits does not cancel existing claims or reset rate permits. [Endpoint maintenance](endpoints.md) documents the API and planned signing-key rotation procedure.
+
 ## Replay audit
 
 `POST /v1/events/{event_id}/replays` requires the `replay` permission, a current terminal attempt ID, a unique request ID, and reason. The server records the authenticated principal ID and its name with the linked attempt in one transaction. Identical submissions by the same principal return the same attempt, including after that attempt succeeds. Credential rotation preserves that identity. Changed inputs or a different principal using the same request ID, active delivery, stale attempt IDs, and already succeeded delivery return HTTP 409.
 
-Replay does not erase the original failure. `GET /v1/dead-letters` lists events whose latest attempt is exhausted; a replay removes the event from that list while preserving its dead-letter row in history. Rows created before migration 004 retain unverified actor labels and have no `replay_principal_id`. New API requests reject `actor`; only the authenticated principal supplies attribution.
+Replay does not erase the original failure. `GET /v1/dead-letters` lists events whose latest attempt is exhausted or expired; a replay removes the event from that list while preserving its dead-letter row in history. Rows created before migration 004 retain unverified actor labels and have no `replay_principal_id`. New API requests reject `actor`; only the authenticated principal supplies attribution.
 
 ## Access and destination policy
 
-Ingestion, inspection, registration, replay, and metrics each require their permission. Credential revocation prevents new authenticated requests; it does not cancel already-accepted events or requests authorized before revocation. Permissions are instance-wide.
+Ingestion, inspection, endpoint administration, replay, and metrics each require their permission. Credential revocation prevents new authenticated requests; it does not cancel already-accepted events or requests authorized before revocation. Permissions are instance-wide.
 
 Every dispatch must pass the worker's deployment-controlled destination policy, including retries, replay, and old endpoints. A rejected destination records `destination_denied` as a terminal failure and does not create a retry. After the policy is corrected and workers restarted, an operator can replay it. DNS and network failures keep the retry classifications above. See [security setup](security.md) for connection-time checks, private-network exceptions, and TLS requirements.
 

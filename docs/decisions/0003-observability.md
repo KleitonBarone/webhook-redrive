@@ -18,6 +18,8 @@ The API exposes Prometheus text at `/metrics`. A read-only repeatable-read Postg
 
 Database-derived counters survive API/worker restarts and do not double-count stale completion attempts. They count claims and committed outcomes, not unobservable remote processing. Histograms use the last claim of each completed logical attempt. Labels are fixed state/outcome enums, never event IDs, endpoint IDs, URLs, or arbitrary errors.
 
+Milestone 6 adds a `paused` queue label and excludes paused work from oldest-ready age. Expiration is a committed `dead_letter` outcome, including attempts that were never sent; such attempts have no claim-based latency sample. The existing `expired` queue label still means an expired lease, not a terminal cycle expiration.
+
 This trades O(retained history) scrape work for simple, consistent counters across workers. Scrape one API target per database; summing replicas would double-count the same data. Retention or a measured scrape bottleneck will require transactional aggregate tables or another accounting design before removing old rows. No aggregate table or monitoring service is added speculatively.
 
 ## Evidence

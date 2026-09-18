@@ -22,13 +22,21 @@ type Store struct {
 }
 
 type Endpoint struct {
-	CreatedBy        string    `json:"created_by,omitempty"`
-	MaxAttempts      int       `json:"max_attempts"`
-	ConcurrencyLimit int       `json:"concurrency_limit"`
-	RateLimit        int       `json:"rate_limit"`
-	ID               string    `json:"id"`
-	URL              string    `json:"url"`
-	CreatedAt        time.Time `json:"created_at"`
+	Version                int64      `json:"version"`
+	Paused                 bool       `json:"paused"`
+	SigningVersion         int64      `json:"signing_version"`
+	RetiringSigningVersion *int64     `json:"retiring_signing_version,omitempty"`
+	RetireAfter            *time.Time `json:"retire_after,omitempty"`
+	RetryBaseSeconds       int        `json:"retry_base_seconds"`
+	RetryCapSeconds        int        `json:"retry_cap_seconds"`
+	EventTTLSeconds        int        `json:"event_ttl_seconds"`
+	CreatedBy              string     `json:"created_by,omitempty"`
+	MaxAttempts            int        `json:"max_attempts"`
+	ConcurrencyLimit       int        `json:"concurrency_limit"`
+	RateLimit              int        `json:"rate_limit"`
+	ID                     string     `json:"id"`
+	URL                    string     `json:"url"`
+	CreatedAt              time.Time  `json:"created_at"`
 }
 
 type Event struct {
@@ -40,6 +48,11 @@ type Event struct {
 }
 
 type Attempt struct {
+	RetryBaseSeconds  int        `json:"retry_base_seconds"`
+	RetryCapSeconds   int        `json:"retry_cap_seconds"`
+	ExpiresAt         *time.Time `json:"expires_at,omitempty"`
+	EndpointVersion   *int64     `json:"endpoint_version,omitempty"`
+	SigningVersion    *int64     `json:"signing_version,omitempty"`
 	ReplayPrincipalID *string    `json:"replay_principal_id,omitempty"`
 	TraceParent       string     `json:"trace_parent,omitempty"`
 	AttemptNumber     int        `json:"attempt_number"`
@@ -65,6 +78,11 @@ type Attempt struct {
 }
 
 type ClaimedDelivery struct {
+	RetryBaseSeconds int
+	RetryCapSeconds  int
+	ExpiresAt        *time.Time
+	EndpointVersion  int64
+	SigningVersion   int64
 	TraceParent      string
 	QueuedAt         time.Time
 	AvailableAt      time.Time
@@ -149,6 +167,16 @@ func (s *Store) applyMigration(ctx context.Context, version, sql string, now tim
 }
 
 func (s *Store) CreateEndpoint(ctx context.Context, endpoint Endpoint, secretCiphertext []byte) error {
+	endpoint.Version, endpoint.SigningVersion = 1, 1
+	if endpoint.RetryBaseSeconds == 0 {
+		endpoint.RetryBaseSeconds = 1
+	}
+	if endpoint.RetryCapSeconds == 0 {
+		endpoint.RetryCapSeconds = 60
+	}
+	if endpoint.EventTTLSeconds == 0 {
+		endpoint.EventTTLSeconds = 86400
+	}
 	if endpoint.MaxAttempts == 0 {
 		endpoint.MaxAttempts = 5
 	}
@@ -158,15 +186,23 @@ func (s *Store) CreateEndpoint(ctx context.Context, endpoint Endpoint, secretCip
 	if endpoint.RateLimit == 0 {
 		endpoint.RateLimit = 10
 	}
-	_, err := s.pool.Exec(ctx, `
-		INSERT INTO webhook_endpoints (id, url, secret_ciphertext, created_at, max_attempts, concurrency_limit, rate_limit, created_by)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,NULLIF($8,'')::uuid)`,
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	_, err = tx.Exec(ctx, `
+		INSERT INTO webhook_endpoints (id, url, secret_ciphertext, created_at, max_attempts, concurrency_limit, rate_limit, created_by,retry_base_seconds,retry_cap_seconds,event_ttl_seconds,paused)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,NULLIF($8,'')::uuid,$9,$10,$11,$12)`,
 		endpoint.ID, endpoint.URL, secretCiphertext, endpoint.CreatedAt,
-		endpoint.MaxAttempts, endpoint.ConcurrencyLimit, endpoint.RateLimit, endpoint.CreatedBy)
+		endpoint.MaxAttempts, endpoint.ConcurrencyLimit, endpoint.RateLimit, endpoint.CreatedBy, endpoint.RetryBaseSeconds, endpoint.RetryCapSeconds, endpoint.EventTTLSeconds, endpoint.Paused)
 	if err != nil {
 		return fmt.Errorf("insert endpoint: %w", err)
 	}
-	return nil
+	if err = auditEndpoint(ctx, tx, endpoint, endpoint.CreatedBy, "created", "endpoint registration", endpoint.CreatedAt); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 // CreateEvent atomically records the exact payload bytes and its first attempt.
@@ -191,8 +227,8 @@ func insertEvent(ctx context.Context, tx pgx.Tx, event Event, payload []byte, at
 	}
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO delivery_attempts (
-			id, event_id, state, available_at, created_at, updated_at, endpoint_id, max_attempts, trace_parent
-		) SELECT $1, $2, 'pending', $3, $3, $3, id, max_attempts, $5 FROM webhook_endpoints WHERE id=$4`, attemptID, event.ID, event.CreatedAt, event.EndpointID, telemetry.Parent(ctx)); err != nil {
+			id, event_id, state, available_at, created_at, updated_at, endpoint_id, max_attempts, trace_parent,retry_base_seconds,retry_cap_seconds,expires_at
+		) SELECT $1, $2, 'pending', $3, $3, $3, id, max_attempts, $5,retry_base_seconds,retry_cap_seconds,$3::timestamptz + event_ttl_seconds * interval '1 second' FROM webhook_endpoints WHERE id=$4`, attemptID, event.ID, event.CreatedAt, event.EndpointID, telemetry.Parent(ctx)); err != nil {
 		return fmt.Errorf("insert delivery attempt: %w", err)
 	}
 	return nil
@@ -231,7 +267,7 @@ func (s *Store) ListAttempts(ctx context.Context, eventID string) ([]Attempt, er
 		SELECT id, event_id, state, claim_count, last_started_at, completed_at,
 		       response_status, error_code, error_message, created_at, updated_at,
 		       attempt_number, cycle_attempt, max_attempts, available_at, retryable,
-		       replay_of, replay_request_id, replay_actor, replay_reason, trace_parent, replay_principal_id
+		       replay_of, replay_request_id, replay_actor, replay_reason, trace_parent, replay_principal_id,retry_base_seconds,retry_cap_seconds,expires_at,endpoint_version,signing_version
 		FROM delivery_attempts
 		WHERE event_id = $1
 		ORDER BY attempt_number`, eventID)
@@ -266,6 +302,7 @@ func (s *Store) ListAttempts(ctx context.Context, eventID string) ([]Attempt, er
 			&attempt.ReplayReason,
 			&attempt.TraceParent,
 			&attempt.ReplayPrincipalID,
+			&attempt.RetryBaseSeconds, &attempt.RetryCapSeconds, &attempt.ExpiresAt, &attempt.EndpointVersion, &attempt.SigningVersion,
 		); err != nil {
 			return nil, fmt.Errorf("scan attempt: %w", err)
 		}

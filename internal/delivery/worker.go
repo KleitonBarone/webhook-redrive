@@ -191,6 +191,9 @@ func (w *Worker) deliver(ctx context.Context, attempt store.ClaimedDelivery) (re
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	if attempt.ExpiresAt != nil && !w.clock.Now().Before(*attempt.ExpiresAt) {
+		return w.finish(ctx, attempt, store.Outcome{Code: "event_expired", Message: "delivery cycle expired"})
+	}
 	// A delayed goroutine must not dispatch after its claim has expired.
 	remaining := attempt.LeaseUntil.Sub(w.clock.Now())
 	if remaining <= 0 {
@@ -250,7 +253,14 @@ func (w *Worker) deliver(ctx context.Context, attempt store.ClaimedDelivery) (re
 
 func (w *Worker) retryAt(attempt store.ClaimedDelivery, retryAfter string) *time.Time {
 	now := w.clock.Now()
-	due := now.Add(max(retry.Delay(attempt.CycleAttempt, w.jitter()), retry.After(retryAfter, now)))
+	base, cap := attempt.RetryBaseSeconds, attempt.RetryCapSeconds
+	if base == 0 {
+		base = 1
+	}
+	if cap == 0 {
+		cap = 60
+	}
+	due := now.Add(max(retry.ConfiguredDelay(attempt.CycleAttempt, w.jitter(), time.Duration(base)*time.Second, time.Duration(cap)*time.Second), retry.After(retryAfter, now)))
 	return &due
 }
 

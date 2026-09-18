@@ -46,11 +46,15 @@ func Transport(err error) bool {
 // Delay uses equal jitter: half the capped exponential delay plus a random
 // fraction of the other half. Supplying the fraction makes tests deterministic.
 func Delay(cycleAttempt int, fraction float64) time.Duration {
-	ceiling := time.Second
-	for n := 1; n < cycleAttempt && ceiling < time.Minute; n++ {
+	return ConfiguredDelay(cycleAttempt, fraction, time.Second, time.Minute)
+}
+
+func ConfiguredDelay(cycleAttempt int, fraction float64, base, cap time.Duration) time.Duration {
+	ceiling := base
+	for n := 1; n < cycleAttempt && ceiling < cap; n++ {
 		ceiling *= 2
 	}
-	ceiling = min(ceiling, time.Minute)
+	ceiling = min(ceiling, cap)
 	fraction = max(0, min(1, fraction))
 	return ceiling/2 + time.Duration(float64(ceiling/2)*fraction)
 }

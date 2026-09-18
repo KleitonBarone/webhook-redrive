@@ -68,3 +68,19 @@ func TestBackoffAndRetryAfter(t *testing.T) {
 		}
 	}
 }
+
+func TestOutageDelayHorizon(t *testing.T) {
+	var earliest, latest time.Duration
+	for n := 1; n < 20; n++ {
+		low := ConfiguredDelay(n, 0, 5*time.Minute, 2*time.Hour)
+		high := ConfiguredDelay(n, 1, 5*time.Minute, 2*time.Hour)
+		if low != high/2 || high > 2*time.Hour {
+			t.Fatal("invalid outage jitter")
+		}
+		earliest += low
+		latest += high
+	}
+	if earliest != 15*time.Hour+17*time.Minute+30*time.Second || latest != 30*time.Hour+35*time.Minute {
+		t.Fatalf("horizon %s..%s", earliest, latest)
+	}
+}

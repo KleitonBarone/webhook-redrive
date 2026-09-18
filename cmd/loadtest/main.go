@@ -236,7 +236,7 @@ func run(c config) (report, error) {
 			count, concurrency = c.SlowEndpoints, c.SlowConcurrency
 			r.SlowEndpoints, r.SlowConcurrency = count, concurrency
 		}
-		body, _ := json.Marshal(map[string]any{"url": strings.TrimRight(c.Receiver, "/") + route, "secret": "local-demo-secret-32-bytes-long", "max_attempts": 2, "concurrency_limit": concurrency, "rate_limit": 1000})
+		body, _ := json.Marshal(map[string]any{"url": strings.TrimRight(c.Receiver, "/") + route, "secret": "local-demo-secret-32-bytes-long", "retry_profile": "demo", "max_attempts": 2, "concurrency_limit": concurrency, "rate_limit": 1000})
 		for range count {
 			var endpoint store.Endpoint
 			if err := call(ctx, client, "POST", api+"/v1/endpoints", body, 201, &endpoint); err != nil {

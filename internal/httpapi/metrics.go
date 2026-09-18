@@ -41,7 +41,7 @@ func (c snapshotCollector) Collect(ch chan<- prometheus.Metric) {
 	} {
 		ch <- prometheus.MustNewConstMetric(prometheus.NewDesc("webhook_"+metric.name, metric.help, nil, nil), prometheus.CounterValue, float64(metric.value))
 	}
-	for _, state := range []string{"ready", "scheduled", "in_progress", "expired"} {
+	for _, state := range []string{"ready", "scheduled", "in_progress", "expired", "paused"} {
 		ch <- prometheus.MustNewConstMetric(prometheus.NewDesc("webhook_queue_depth", "Unfinished attempts by eligibility or lease state.", []string{"state"}, nil), prometheus.GaugeValue, float64(m.Queue[state]), state)
 	}
 	for _, state := range []string{"pending", "in_progress", "succeeded", "failed", "dead_letter"} {

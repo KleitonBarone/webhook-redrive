@@ -20,6 +20,16 @@ var ErrBusinessConflict = errors.New("business event identity conflicts with pro
 // Give each integration its own secret and receipt namespace. Never trust the
 // unsigned X-Webhook-ID or X-Webhook-Event headers for business decisions.
 func Receiver(pool *pgxpool.Pool, secret []byte, now func() time.Time) http.Handler {
+	return ReceiverWithKeys(pool, [][]byte{secret}, now)
+}
+
+// ReceiverWithKeys accepts old and new signing keys during a planned rotation.
+// Rebuild the handler after retirement rather than mutating its key ring.
+func ReceiverWithKeys(pool *pgxpool.Pool, keys [][]byte, now func() time.Time) http.Handler {
+	captured := make([][]byte, len(keys))
+	for i, key := range keys {
+		captured[i] = append([]byte(nil), key...)
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			w.WriteHeader(http.StatusMethodNotAllowed)
@@ -30,7 +40,7 @@ func Receiver(pool *pgxpool.Pool, secret []byte, now func() time.Time) http.Hand
 			http.Error(w, "invalid body", 400)
 			return
 		}
-		if len(secret) < 16 || signature.VerifyRequest(secret, r, body, now(), 5*time.Minute) != nil {
+		if signature.VerifyRequestKeys(captured, r, body, now(), 5*time.Minute) != nil {
 			http.Error(w, "invalid signature", 401)
 			return
 		}

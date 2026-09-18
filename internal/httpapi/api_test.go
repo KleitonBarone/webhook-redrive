@@ -21,12 +21,27 @@ type apiClock struct{ now time.Time }
 func (clock apiClock) Now() time.Time { return clock.now }
 
 type fakeStore struct {
+	endpointChange   store.EndpointChange
 	replayInput      store.ReplayRequest
 	endpoint         store.Endpoint
 	secretCiphertext []byte
 	event            store.Event
 	payload          []byte
 	attemptID        string
+}
+
+func (s *fakeStore) GetEndpoint(context.Context, string) (store.Endpoint, error) {
+	return s.endpoint, nil
+}
+func (s *fakeStore) ListEndpoints(context.Context, string) ([]store.Endpoint, error) {
+	return []store.Endpoint{s.endpoint}, nil
+}
+func (s *fakeStore) ListEndpointAudit(context.Context, string, int64) ([]store.EndpointAudit, error) {
+	return []store.EndpointAudit{}, nil
+}
+func (s *fakeStore) ChangeEndpoint(_ context.Context, _ string, c store.EndpointChange, _ time.Time) (store.Endpoint, error) {
+	s.endpointChange = c
+	return c.Settings, nil
 }
 
 func (s *fakeStore) Metrics(context.Context, time.Time) (store.MetricsSnapshot, error) {

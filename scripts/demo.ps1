@@ -32,7 +32,12 @@ function Send-DemoEvent([int]$Failures) {
         secret = "local-demo-secret-32-bytes-long"
         max_attempts = 3
         concurrency_limit = 1
+        retry_profile = 'demo'
         rate_limit = 5
+    } | ConvertTo-Json)
+    $endpoint = Invoke-RestMethod -Headers $apiHeaders -Method Post -Uri "$BaseUrl/v1/endpoints/$($endpoint.id)/pause" -ContentType application/json -Body (@{
+        expected_version = $endpoint.version
+        reason = 'Synthetic maintenance before ingestion'
     } | ConvertTo-Json)
     $ingestHeaders = @{
         "X-Event-Type" = "demo.order"
@@ -47,7 +52,16 @@ function Send-DemoEvent([int]$Failures) {
     }
     $conflict = Invoke-WebRequest -SkipHttpErrorCheck -Method Post -Uri "$BaseUrl/v1/endpoints/$($endpoint.id)/events" -ContentType application/json -Headers $ingestHeaders -Body '{"order_id":"changed","amount":1250}'
     if ($conflict.StatusCode -ne 409) { throw 'Conflicting ingestion key was accepted.' }
-    $accepted.Content | ConvertFrom-Json
+    $event = $accepted.Content | ConvertFrom-Json
+    $queued = (Invoke-RestMethod -Headers $apiHeaders "$BaseUrl/v1/events/$($event.id)/attempts").attempts
+    if ($queued.Count -ne 1 -or $queued[0].state -ne 'pending' -or $queued[0].claim_count -ne 0) { throw 'Paused endpoint dispatched queued work.' }
+    $endpoint = Invoke-RestMethod -Headers $apiHeaders -Method Post -Uri "$BaseUrl/v1/endpoints/$($endpoint.id)/resume" -ContentType application/json -Body (@{
+        expected_version = $endpoint.version
+        reason = 'Synthetic maintenance complete'
+    } | ConvertTo-Json)
+    $audit = (Invoke-RestMethod -Headers $apiHeaders "$BaseUrl/v1/endpoints/$($endpoint.id)/audit").entries
+    if (($audit.action -join ',') -ne 'created,paused,resumed' -or @($audit | Where-Object { $_.principal_id -ne '00000000-0000-4000-8000-000000000001' }).Count -ne 0) { throw 'Endpoint audit is incomplete.' }
+    $event
 }
 
 function Wait-ForState([string]$EventId, [string]$Expected) {
@@ -124,4 +138,4 @@ if ($probe.StatusCode -ne 401) { throw 'Revoked credential was accepted.' }
     [pscustomobject]@{ scenario = "retry recovery"; event_id = $eventual.id; state = "succeeded"; attempts = 3 }
     [pscustomobject]@{ scenario = "dead letter then replay"; event_id = $exhausted.id; state = "succeeded"; attempts = 4 }
 ) | Format-Table -AutoSize
-Write-Output "Verified idempotent ingestion, key conflicts, seven signed deliveries, unchanged bytes, traces, metrics, authenticated replay, permission denial, destination rejection, and credential revocation."
+Write-Output "Verified pause/resume and endpoint audit, idempotent ingestion, key conflicts, seven signed deliveries, unchanged bytes, traces, metrics, authenticated replay, permission denial, destination rejection, and credential revocation."

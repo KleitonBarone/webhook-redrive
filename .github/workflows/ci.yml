@@ -41,6 +41,8 @@ jobs:
         run: go test -race -count=1 ./...
       - name: Demonstrate outbox and receiver crash recovery
         run: go test -race -count=1 -v ./internal/integration -run '^TestOutboxToReceiverDemo$'
+      - name: Demonstrate endpoint lifecycle and outage recovery
+        run: go test -race -count=1 -v ./internal/integration -run '^TestEndpointLifecycleDemo$'
 
   demo:
     runs-on: ubuntu-latest

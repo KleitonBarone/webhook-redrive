@@ -52,3 +52,35 @@ func TestPublicWireVectorAndMalformedHeaders(t *testing.T) {
 		}
 	}
 }
+
+func TestRotationKeyRing(t *testing.T) {
+	old, newKey := []byte("synthetic-old-signing-secret"), []byte("synthetic-new-signing-secret")
+	body := []byte(`{"id":"synthetic"}`)
+	now := time.Unix(1787832000, 0)
+	for _, key := range [][]byte{old, newKey} {
+		req := httptest.NewRequest("POST", "/", nil)
+		req.Header.Set("X-Webhook-Timestamp", "1787832000")
+		req.Header.Set("X-Webhook-Signature", signature.Sign(key, now, body))
+		if err := signature.VerifyRequestKeys([][]byte{old, newKey}, req, body, now, time.Minute); err != nil {
+			t.Fatal(err)
+		}
+		if signature.VerifyRequestKeys([][]byte{old, newKey}, req, body, now.Add(time.Minute+time.Second), time.Minute) == nil {
+			t.Fatal("stale overlap signature accepted")
+		}
+		req.Header.Add("X-Webhook-Signature", req.Header.Get("X-Webhook-Signature"))
+		if signature.VerifyRequestKeys([][]byte{old, newKey}, req, body, now, time.Minute) == nil {
+			t.Fatal("duplicate overlap header accepted")
+		}
+	}
+	req := httptest.NewRequest("POST", "/", nil)
+	req.Header.Set("X-Webhook-Timestamp", "1787832000")
+	req.Header.Set("X-Webhook-Signature", signature.Sign(old, now, body))
+	if signature.VerifyRequestKeys([][]byte{newKey}, req, body, now, time.Minute) == nil {
+		t.Fatal("retired key accepted")
+	}
+	for _, keys := range [][][]byte{nil, {old, []byte("short")}, {old, newKey, old}} {
+		if signature.VerifyRequestKeys(keys, req, body, now, time.Minute) == nil {
+			t.Fatal("invalid key ring accepted")
+		}
+	}
+}

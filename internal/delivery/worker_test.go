@@ -175,3 +175,18 @@ func TestMissingDestinationPolicyRecordsTerminalFailureWithoutSending(t *testing
 		t.Fatalf("outcome %+v", s.lastOutcome)
 	}
 }
+
+func TestDeadlineAtDispatchDoesNotSend(t *testing.T) {
+	now := time.Unix(100, 0)
+	receiver := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { t.Error("expired delivery sent") }))
+	defer receiver.Close()
+	box, _ := secret.NewBox(make([]byte, secret.KeySize))
+	s := &fakeAttemptStore{delivery: store.ClaimedDelivery{EndpointURL: receiver.URL, ExpiresAt: &now}}
+	w := newTestWorker(t, s, box, fixedClock{now: now}, time.Second)
+	if _, err := w.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if s.lastOutcome.Code != "event_expired" || s.lastOutcome.RetryAt != nil {
+		t.Fatal("expired dispatch was retryable")
+	}
+}

@@ -5,6 +5,7 @@ This package demonstrates business-transaction safety around Webhook Redrive. It
 - `Create` commits an order and immutable outbox bytes together.
 - `NewPublisher` and `PublishOne` submit pending rows with a stable idempotency key and persist acceptance.
 - `Receiver` verifies signatures, then commits a business receipt and order-total update together.
+- `ReceiverWithKeys` accepts old and new keys during a coordinated signing rotation. Follow the [retirement procedure](../../docs/endpoints.md#rotate-a-signing-secret) before removing the old key.
 
 Use a dedicated schema for `schema.sql`. Credentials stay outside the outbox. The API principal must have `ingest`; endpoint registration is a separate administrative step.
 

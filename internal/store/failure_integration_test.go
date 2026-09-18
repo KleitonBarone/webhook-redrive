@@ -289,8 +289,15 @@ func TestMigrationPreservesMilestoneOneData(t *testing.T) {
 	if err != nil || len(history) != 1 || history[0].State != "failed" || history[0].AttemptNumber != 1 {
 		t.Fatalf("migration history=%v err=%v", history, err)
 	}
+	if history[0].ExpiresAt != nil || history[0].EndpointVersion != nil {
+		t.Fatal("migration invented historical deadline or configuration")
+	}
 	input := ReplayRequest{AttemptID: attempt, RequestID: mustID(t), Actor: "test", Reason: "upgrade"}
 	if _, err := s.Replay(context.Background(), event, input, testNow); err != nil {
 		t.Fatal(err)
+	}
+	history, err = s.ListAttempts(context.Background(), event)
+	if err != nil || len(history) != 2 || history[1].ExpiresAt == nil || !history[1].ExpiresAt.Equal(testNow.Add(24*time.Hour)) {
+		t.Fatal("post-upgrade replay lacks finite deadline")
 	}
 }

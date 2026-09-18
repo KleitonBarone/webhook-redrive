@@ -2,6 +2,8 @@
 
 Status: accepted on 2026-09-09.
 
+Milestone 6 supersedes the fixed timing and replay-budget rules below with [snapshotted retry policy and bounded cycle deadlines](0007-endpoint-lifecycle.md). Explicit replay now adopts current endpoint policy; automatic retries retain their cycle's policy.
+
 ## Attempts and retry budgets
 
 Every completed HTTP dispatch has an attempt row. An expired claim reuses that row because the previous worker's outcome is unknown. A retry creates a successor row with a later `available_at`. Completion and successor creation share one transaction.

@@ -33,10 +33,12 @@ func (s *Store) Complete(ctx context.Context, claim ClaimedDelivery, workerID st
 	}
 	var number, cycle, maximum int
 	var endpointID string
-	err = tx.QueryRow(ctx, `SELECT attempt_number, cycle_attempt, max_attempts, endpoint_id
+	var base, cap int
+	var expires *time.Time
+	err = tx.QueryRow(ctx, `SELECT attempt_number, cycle_attempt, max_attempts, endpoint_id,retry_base_seconds,retry_cap_seconds,expires_at
         FROM delivery_attempts WHERE id=$1 AND event_id=$2 AND state='in_progress'
         AND claimed_by=$3 AND claim_count=$4 AND lease_until > $5 FOR UPDATE`,
-		claim.AttemptID, claim.EventID, workerID, claim.ClaimCount, now).Scan(&number, &cycle, &maximum, &endpointID)
+		claim.AttemptID, claim.EventID, workerID, claim.ClaimCount, now).Scan(&number, &cycle, &maximum, &endpointID, &base, &cap, &expires)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
 	}
@@ -51,6 +53,9 @@ func (s *Store) Complete(ctx context.Context, claim ClaimedDelivery, workerID st
 			state = "dead_letter"
 		}
 	}
+	if outcome.Code == "event_expired" || (outcome.Code != "" && expires != nil && !now.Before(*expires)) {
+		state = "dead_letter"
+	}
 	_, err = tx.Exec(ctx, `UPDATE delivery_attempts SET state=$2, completed_at=$3,
         updated_at=$3, lease_until=NULL, response_status=NULLIF($4,0),
         error_code=NULLIF($5,''), error_message=NULLIF($6,''), retryable=$7 WHERE id=$1`,
@@ -59,14 +64,18 @@ func (s *Store) Complete(ctx context.Context, claim ClaimedDelivery, workerID st
 		return false, err
 	}
 	if state == "failed" && retryable {
+		due := *outcome.RetryAt
+		if expires != nil && due.After(*expires) {
+			due = *expires
+		}
 		nextID, err := id.New()
 		if err != nil {
 			return false, err
 		}
 		_, err = tx.Exec(ctx, `INSERT INTO delivery_attempts
-            (id,event_id,endpoint_id,state,attempt_number,cycle_attempt,max_attempts,available_at,created_at,updated_at,trace_parent)
-            VALUES ($1,$2,$3,'pending',$4,$5,$6,$7,$8,$8,$9)`,
-			nextID, claim.EventID, endpointID, number+1, cycle+1, maximum, outcome.RetryAt, now, telemetry.Parent(ctx))
+            (id,event_id,endpoint_id,state,attempt_number,cycle_attempt,max_attempts,available_at,created_at,updated_at,trace_parent,retry_base_seconds,retry_cap_seconds,expires_at)
+            VALUES ($1,$2,$3,'pending',$4,$5,$6,$7,$8,$8,$9,$10,$11,$12)`,
+			nextID, claim.EventID, endpointID, number+1, cycle+1, maximum, due, now, telemetry.Parent(ctx), base, cap, expires)
 		if err != nil {
 			return false, fmt.Errorf("schedule retry: %w", err)
 		}
@@ -122,9 +131,9 @@ func (s *Store) Replay(ctx context.Context, eventID string, input ReplayRequest,
 		return ReplayResult{}, err
 	}
 	var latestID, state, parent string
-	var number, maximum int
-	err = tx.QueryRow(ctx, `SELECT id,state,attempt_number,max_attempts,trace_parent FROM delivery_attempts
-		WHERE event_id=$1 ORDER BY attempt_number DESC LIMIT 1`, eventID).Scan(&latestID, &state, &number, &maximum, &parent)
+	var number int
+	err = tx.QueryRow(ctx, `SELECT id,state,attempt_number,trace_parent FROM delivery_attempts
+		WHERE event_id=$1 ORDER BY attempt_number DESC LIMIT 1`, eventID).Scan(&latestID, &state, &number, &parent)
 	if err != nil {
 		return ReplayResult{}, err
 	}
@@ -140,9 +149,11 @@ func (s *Store) Replay(ctx context.Context, eventID string, input ReplayRequest,
 	}
 	_, err = tx.Exec(ctx, `INSERT INTO delivery_attempts
         (id,event_id,endpoint_id,state,attempt_number,cycle_attempt,max_attempts,available_at,created_at,updated_at,
-         replay_of,replay_request_id,replay_actor,replay_reason,trace_parent,replay_principal_id)
-        VALUES ($1,$2,$3,'pending',$4,1,$5,$6,$6,$6,$7,$8,$9,$10,$11,NULLIF($12,'')::uuid)`,
-		nextID, eventID, endpointID, number+1, maximum, now, input.AttemptID, input.RequestID, input.Actor, input.Reason, telemetry.Parent(ctx), input.PrincipalID)
+         replay_of,replay_request_id,replay_actor,replay_reason,trace_parent,replay_principal_id,retry_base_seconds,retry_cap_seconds,expires_at)
+        SELECT $1,$2,$3,'pending',$4,1,max_attempts,$5,$5,$5,$6,$7,$8,$9,$10,NULLIF($11,'')::uuid,
+            retry_base_seconds,retry_cap_seconds,$5::timestamptz+event_ttl_seconds * interval '1 second'
+        FROM webhook_endpoints WHERE id=$3`,
+		nextID, eventID, endpointID, number+1, now, input.AttemptID, input.RequestID, input.Actor, input.Reason, telemetry.Parent(ctx), input.PrincipalID)
 	if err != nil {
 		var postgresError *pgconn.PgError
 		if errors.As(err, &postgresError) && postgresError.Code == "23505" {

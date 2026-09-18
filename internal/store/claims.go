@@ -19,12 +19,24 @@ func (s *Store) ClaimAvailable(ctx context.Context, workerID string, now time.Ti
 		return nil, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+	// Expire bounded batches even when endpoints are paused or rate limited.
+	// Never overwrite a live lease; its worker may still acknowledge success.
+	if _, err = tx.Exec(ctx, `WITH due AS (
+        SELECT id FROM delivery_attempts WHERE expires_at <= $1
+        AND (state='pending' OR (state='in_progress' AND lease_until <= $1))
+        ORDER BY expires_at,id LIMIT 1000 FOR UPDATE SKIP LOCKED
+    ) UPDATE delivery_attempts a SET state='dead_letter',completed_at=$1,updated_at=$1,lease_until=NULL,
+        error_code='event_expired',error_message='delivery cycle expired',retryable=false
+        FROM due WHERE a.id=due.id`, now); err != nil {
+		return nil, err
+	}
 	rows, err := tx.Query(ctx, `
         SELECT endpoint.id FROM webhook_endpoints endpoint
-        WHERE (rate_window <= $1::timestamptz - INTERVAL '1 second' OR rate_used < rate_limit)
+        WHERE NOT endpoint.paused AND (rate_window <= $1::timestamptz - INTERVAL '1 second' OR rate_used < rate_limit)
           AND (SELECT count(*) FROM delivery_attempts a WHERE a.endpoint_id=endpoint.id
                AND a.state='in_progress' AND a.lease_until > $1) < concurrency_limit
           AND EXISTS (SELECT 1 FROM delivery_attempts a WHERE a.endpoint_id=endpoint.id
+               AND (a.expires_at IS NULL OR a.expires_at > $1)
                AND a.available_at <= $1 AND (a.state='pending' OR (a.state='in_progress' AND a.lease_until <= $1)))
         ORDER BY (SELECT min(a.available_at) FROM delivery_attempts a WHERE a.endpoint_id=endpoint.id
                   AND a.state IN ('pending','in_progress')), endpoint.id
@@ -57,16 +69,19 @@ func (s *Store) ClaimAvailable(ctx context.Context, workerID string, now time.Ti
 		rows, err := tx.Query(ctx, `
             WITH candidates AS (
                 SELECT id FROM delivery_attempts WHERE endpoint_id=$1 AND available_at <= $2
+                  AND (expires_at IS NULL OR expires_at > $2)
                   AND (state='pending' OR (state='in_progress' AND lease_until <= $2))
                 ORDER BY available_at, id LIMIT $3 FOR UPDATE SKIP LOCKED
             ), claimed AS (
                 UPDATE delivery_attempts a SET state='in_progress', lease_until=$4,
-                    claimed_by=$5, claim_count=claim_count+1, last_started_at=$2, updated_at=$2
+                    claimed_by=$5, claim_count=claim_count+1, last_started_at=$2, updated_at=$2,
+                    endpoint_version=(SELECT version FROM webhook_endpoints WHERE id=$1),
+                    signing_version=(SELECT signing_version FROM webhook_endpoints WHERE id=$1)
                 FROM candidates WHERE a.id=candidates.id RETURNING a.*
             )
             SELECT c.id, e.id, e.event_type, e.payload, endpoint.id, endpoint.url,
                    endpoint.secret_ciphertext, c.claim_count, c.cycle_attempt, c.lease_until,
-                   c.trace_parent, c.created_at, c.available_at
+                   c.trace_parent, c.created_at, c.available_at,c.retry_base_seconds,c.retry_cap_seconds,c.expires_at,c.endpoint_version,c.signing_version
             FROM claimed c JOIN events e ON e.id=c.event_id
             JOIN webhook_endpoints endpoint ON endpoint.id=c.endpoint_id`,
 			endpointID, now, take, now.Add(lease), workerID)
@@ -77,7 +92,7 @@ func (s *Store) ClaimAvailable(ctx context.Context, workerID string, now time.Ti
 			var d ClaimedDelivery
 			err := row.Scan(&d.AttemptID, &d.EventID, &d.EventType, &d.Payload,
 				&d.EndpointID, &d.EndpointURL, &d.SecretCiphertext, &d.ClaimCount, &d.CycleAttempt, &d.LeaseUntil,
-				&d.TraceParent, &d.QueuedAt, &d.AvailableAt)
+				&d.TraceParent, &d.QueuedAt, &d.AvailableAt, &d.RetryBaseSeconds, &d.RetryCapSeconds, &d.ExpiresAt, &d.EndpointVersion, &d.SigningVersion)
 			return d, err
 		})
 		if err != nil {

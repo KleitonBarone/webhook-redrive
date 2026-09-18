@@ -39,22 +39,23 @@ func (s *Store) Metrics(ctx context.Context, now time.Time) (MetricsSnapshot, er
 		return m, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	var ready, scheduled, active, expired int64
-	err = tx.QueryRow(ctx, `SELECT count(*) FILTER (WHERE state='pending' AND available_at <= $1),
-        count(*) FILTER (WHERE state='pending' AND available_at > $1),
+	var ready, scheduled, active, expired, paused int64
+	err = tx.QueryRow(ctx, `SELECT count(*) FILTER (WHERE NOT e.paused AND state='pending' AND available_at <= $1),
+        count(*) FILTER (WHERE NOT e.paused AND state='pending' AND available_at > $1),
         count(*) FILTER (WHERE state='in_progress' AND lease_until > $1),
-        count(*) FILTER (WHERE state='in_progress' AND lease_until <= $1),
+        count(*) FILTER (WHERE NOT e.paused AND state='in_progress' AND lease_until <= $1),
         coalesce(sum(claim_count),0), coalesce(sum(greatest(claim_count-1,0)),0),
         count(*) FILTER (WHERE cycle_attempt > 1), count(*) FILTER (WHERE replay_of IS NOT NULL),
         coalesce(max(greatest(0,extract(epoch FROM $1::timestamptz -
             CASE WHEN state='in_progress' THEN lease_until ELSE available_at END))) FILTER
-            (WHERE (state='pending' AND available_at <= $1) OR (state='in_progress' AND lease_until <= $1)),0)
-        FROM delivery_attempts`, now).Scan(&ready, &scheduled, &active, &expired,
-		&m.Claims, &m.Recoveries, &m.Retries, &m.Replays, &m.OldestReadySeconds)
+            (WHERE NOT e.paused AND ((state='pending' AND available_at <= $1) OR (state='in_progress' AND lease_until <= $1))),0),
+        count(*) FILTER (WHERE e.paused AND (state='pending' OR (state='in_progress' AND lease_until <= $1)))
+        FROM delivery_attempts a JOIN webhook_endpoints e ON e.id=a.endpoint_id`, now).Scan(&ready, &scheduled, &active, &expired,
+		&m.Claims, &m.Recoveries, &m.Retries, &m.Replays, &m.OldestReadySeconds, &paused)
 	if err != nil {
 		return m, err
 	}
-	m.Queue = map[string]int64{"ready": ready, "scheduled": scheduled, "in_progress": active, "expired": expired}
+	m.Queue = map[string]int64{"ready": ready, "scheduled": scheduled, "in_progress": active, "expired": expired, "paused": paused}
 	rows, err := tx.Query(ctx, `SELECT state,count(*) FROM (
         SELECT DISTINCT ON (event_id) state FROM delivery_attempts ORDER BY event_id,attempt_number DESC
         ) latest GROUP BY state`)

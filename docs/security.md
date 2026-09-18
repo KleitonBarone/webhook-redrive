@@ -25,8 +25,8 @@ In Compose, use `docker compose exec -T api admin` instead of `go run ./cmd/admi
 | Permission | Protected operations |
 | --- | --- |
 | `ingest` | Submit events to any registered endpoint |
-| `inspect` | Read any event, attempt history, and dead letters |
-| `endpoints` | Register endpoints within deployment policy |
+| `inspect` | Read endpoints, configuration audit, events, attempt history, and dead letters |
+| `endpoints` | Register, update, pause/resume, and rotate endpoint signing keys within deployment policy |
 | `replay` | Replay eligible failed events |
 | `metrics` | Read `/metrics` |
 

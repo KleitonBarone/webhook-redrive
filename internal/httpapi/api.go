@@ -31,6 +31,10 @@ const (
 type dataStore interface {
 	Metrics(context.Context, time.Time) (store.MetricsSnapshot, error)
 	CreateEndpoint(context.Context, store.Endpoint, []byte) error
+	GetEndpoint(context.Context, string) (store.Endpoint, error)
+	ListEndpoints(context.Context, string) ([]store.Endpoint, error)
+	ListEndpointAudit(context.Context, string, int64) ([]store.EndpointAudit, error)
+	ChangeEndpoint(context.Context, string, store.EndpointChange, time.Time) (store.Endpoint, error)
 	EndpointExists(context.Context, string) (bool, error)
 	IngestEvent(context.Context, store.Event, []byte, string, string, string) (store.IngestionReceipt, error)
 	GetEvent(context.Context, string) (store.Event, error)
@@ -57,6 +61,14 @@ func New(dataStore dataStore, box *secret.Box, serviceClock clock.Clock, logger 
 	mux.HandleFunc("GET /healthz", api.health)
 	mux.HandleFunc("GET /metrics", api.require(auth.Metrics, api.metrics))
 	mux.HandleFunc("POST /v1/endpoints", api.require(auth.Endpoints, api.createEndpoint))
+	mux.HandleFunc("GET /v1/endpoints", api.require(auth.Inspect, api.listEndpoints))
+	mux.HandleFunc("GET /v1/endpoints/{endpointID}", api.require(auth.Inspect, api.getEndpoint))
+	mux.HandleFunc("GET /v1/endpoints/{endpointID}/audit", api.require(auth.Inspect, api.endpointAudit))
+	mux.HandleFunc("PUT /v1/endpoints/{endpointID}", api.require(auth.Endpoints, api.updateEndpoint))
+	mux.HandleFunc("POST /v1/endpoints/{endpointID}/pause", api.require(auth.Endpoints, api.endpointAction("paused")))
+	mux.HandleFunc("POST /v1/endpoints/{endpointID}/resume", api.require(auth.Endpoints, api.endpointAction("resumed")))
+	mux.HandleFunc("POST /v1/endpoints/{endpointID}/secret-rotations", api.require(auth.Endpoints, api.endpointAction("rotated")))
+	mux.HandleFunc("POST /v1/endpoints/{endpointID}/secret-retirement", api.require(auth.Endpoints, api.endpointAction("retired")))
 	mux.HandleFunc("POST /v1/endpoints/{endpointID}/events", api.require(auth.Ingest, api.traced("webhook.ingest", api.createEvent)))
 	mux.HandleFunc("GET /v1/events/{eventID}", api.require(auth.Inspect, api.getEvent))
 	mux.HandleFunc("GET /v1/events/{eventID}/attempts", api.require(auth.Inspect, api.listAttempts))
@@ -71,30 +83,20 @@ func (a *API) health(w http.ResponseWriter, _ *http.Request) {
 
 func (a *API) createEndpoint(w http.ResponseWriter, request *http.Request) {
 	input := struct {
-		URL              string `json:"url"`
-		Secret           string `json:"secret"`
-		MaxAttempts      int    `json:"max_attempts"`
-		ConcurrencyLimit int    `json:"concurrency_limit"`
-		RateLimit        int    `json:"rate_limit"`
-	}{MaxAttempts: 5, ConcurrencyLimit: 2, RateLimit: 10}
+		endpointSettings
+		Secret string `json:"secret"`
+	}{}
 	if err := decodeJSON(w, request, &input); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid endpoint request")
 		return
 	}
-	if err := validateEndpointURL(input.URL); err != nil {
+	endpoint, err := a.endpointSettings(input.endpointSettings)
+	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if err := a.security.Destinations.Validate(input.URL); err != nil {
-		writeError(w, http.StatusBadRequest, "destination denied")
 		return
 	}
 	if len(input.Secret) < minSecretBytes {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("secret must be at least %d bytes", minSecretBytes))
-		return
-	}
-	if input.MaxAttempts < 1 || input.MaxAttempts > 20 || input.ConcurrencyLimit < 1 || input.ConcurrencyLimit > 100 || input.RateLimit < 1 || input.RateLimit > 1000 {
-		writeError(w, http.StatusBadRequest, "max_attempts must be 1..20, concurrency_limit 1..100, and rate_limit 1..1000")
 		return
 	}
 
@@ -108,9 +110,7 @@ func (a *API) createEndpoint(w http.ResponseWriter, request *http.Request) {
 		a.internalError(w, request, "generate endpoint id", err)
 		return
 	}
-	endpoint := store.Endpoint{ID: endpointID, URL: input.URL, CreatedAt: a.clock.Now(),
-		CreatedBy:   auth.FromContext(request.Context()).ID,
-		MaxAttempts: input.MaxAttempts, ConcurrencyLimit: input.ConcurrencyLimit, RateLimit: input.RateLimit}
+	endpoint.ID, endpoint.CreatedAt, endpoint.CreatedBy = endpointID, a.clock.Now(), auth.FromContext(request.Context()).ID
 	if err := a.store.CreateEndpoint(request.Context(), endpoint, ciphertext); err != nil {
 		a.internalError(w, request, "create endpoint", err)
 		return

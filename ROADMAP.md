@@ -6,9 +6,9 @@ This roadmap favors a small, explainable delivery system before distributed infr
 
 Target a small engineering team self-hosting outbound webhook delivery. Its application submits JSON events to known destinations; Webhook Redrive handles durable delivery, retries, signatures, and recovery.
 
-Milestones 0 through 5 and the measured follow-ups are complete. The delivery engine has authenticated access, deployment-controlled destinations, scoped ingestion idempotency, and producer/receiver reference code. This is not a production-readiness claim. Endpoint settings are still fixed at registration, and data retention remains unbounded.
+Milestones 0 through 6 and the measured follow-ups are complete. The delivery engine has authenticated access, controlled destinations, ingestion idempotency, producer/receiver reference code, audited endpoint maintenance, planned signing rotation, and bounded outage recovery. This is not a production-readiness claim. Investigation is still limited to individual events and dead-letter listing, and data retention remains unbounded.
 
-The next priority is endpoint lifecycle and outage recovery. Work through milestones 6 through 8 in order before further scheduling optimization. Keep one HTTP service, one worker process, and PostgreSQL. These plans do not authorize deployment or access to live systems.
+The next priority is operator investigation and bulk recovery. Work through milestones 7 and 8 before further scheduling optimization. Keep one HTTP service, one worker process, and PostgreSQL. These plans do not authorize deployment or access to live systems.
 
 ## 0. Foundation
 
@@ -100,16 +100,20 @@ The [verification record](docs/verification/milestone-5/README.md) includes loca
 
 ## 6. Endpoint lifecycle and outage recovery
 
-Routine maintenance must not require database edits or recreating an integration. The current default retry backoff lasts seconds, not hours, without a longer `Retry-After`.
+Implemented with version-checked endpoint edits, authenticated configuration audit, pause/resume, receiver-first signing rotation, and per-cycle retry/deadline snapshots. See [endpoint operations and the runnable demo](docs/endpoints.md) and the [decision record](docs/decisions/0007-endpoint-lifecycle.md).
 
-- [ ] Add endpoint listing, inspection, and updates for destination and delivery settings
-- [ ] Add pause/resume with explicit behavior for new ingestion, queued work, and already-running requests
-- [ ] Support signing-secret rotation with a documented overlap and retirement procedure
-- [ ] Define which endpoint changes apply to queued attempts and replay; preserve delivery history and audit configuration changes
-- [ ] Add a configurable outage-oriented retry policy with a documented horizon, attempt budget, and event expiration
-- [ ] Keep an explicit short retry profile for the local demo
+- [x] Add endpoint listing, inspection, and updates for destination and delivery settings
+- [x] Add pause/resume with explicit behavior for new ingestion, queued work, and already-running requests
+- [x] Support signing-secret rotation with a documented overlap and retirement procedure
+- [x] Define which endpoint changes apply to queued attempts and replay; preserve delivery history and audit configuration changes
+- [x] Add a configurable outage-oriented retry policy with a documented horizon, attempt budget, and event expiration
+- [x] Keep an explicit short retry profile for the local demo
 
-Acceptance evidence: pause/resume does not lose queued intent; secret rotation preserves verifiable delivery during the transition. Deterministic-clock tests cover a prolonged outage, worker restart, expiration, and recovery without extending retries indefinitely. Destination changes remain subject to milestone 4's policy.
+Acceptance evidence: the Go 1.24 race-enabled PostgreSQL suite passed. The HTTP lifecycle demo verified pause with an old-key request in flight, new-key delivery to an updated destination, guarded retirement, recovery after a six-hour simulated outage with a fresh worker/database pool, and expiration at 24 simulated hours. Explicit replay adopted current policy without changing old history. Tests cover concurrent edits and claim locking, audit rollback, reduced limits, bounded expiration, deadline fencing, permissions, destination denial, and redaction. The Compose demo passed pause/resume, endpoint audit, and all previous retry/replay assertions.
+
+The short profile remains the compatibility default; `outage` is explicit and configurable. Pause does not cancel existing claims or freeze deadlines. Retirement requires receiver coordination and is not emergency revocation. Pre-upgrade cycles keep their prior budget without retroactive expiration. New cycles and explicit replay have finite deadlines. No retention cleanup or distributed service was added.
+
+The [verification record](docs/verification/milestone-6/README.md) includes raw mixed, fairness, and saturation results. Saturation passed delivery correctness, but a detected host-clock jump invalidated its timing. These finite workloads do not establish production capacity.
 
 ## 7. Operator investigation and bulk recovery
 
