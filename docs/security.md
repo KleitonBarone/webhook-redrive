@@ -25,9 +25,9 @@ In Compose, use `docker compose exec -T api admin` instead of `go run ./cmd/admi
 | Permission | Protected operations |
 | --- | --- |
 | `ingest` | Submit events to any registered endpoint |
-| `inspect` | Read endpoints, configuration audit, events, attempt history, and dead letters |
+| `inspect` | Read endpoints, configuration audit, event search, attempt history, dead letters, and recovery batches |
 | `endpoints` | Register, update, pause/resume, and rotate endpoint signing keys within deployment policy |
-| `replay` | Replay eligible failed events |
+| `replay` | Replay eligible failed events; preview bulk recovery and confirm/resume batches owned by the principal |
 | `metrics` | Read `/metrics` |
 
 Combine permissions with commas, for example `--permissions inspect,replay`. `--kind operator` labels an operator identity but grants no permissions by itself. All permissions apply to the whole installation. Use separate credentials per caller; a bearer token identifies its assigned principal, not the human holding it. Only `/healthz` is unauthenticated.

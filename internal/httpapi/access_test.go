@@ -30,6 +30,10 @@ func TestEveryProtectedRouteRequiresItsPermission(t *testing.T) {
 		{"GET", "/v1/events/" + uuid + "/attempts", auth.Inspect},
 		{"POST", "/v1/events/" + uuid + "/replays", auth.Replay},
 		{"GET", "/v1/dead-letters", auth.Inspect},
+		{"GET", "/v1/events", auth.Inspect},
+		{"POST", "/v1/replay-batches", auth.Replay},
+		{"GET", "/v1/replay-batches/" + uuid, auth.Inspect},
+		{"POST", "/v1/replay-batches/" + uuid + "/run", auth.Replay},
 		{"GET", "/metrics", auth.Metrics},
 	}
 	for _, route := range routes {

@@ -6,9 +6,9 @@ This roadmap favors a small, explainable delivery system before distributed infr
 
 Target a small engineering team self-hosting outbound webhook delivery. Its application submits JSON events to known destinations; Webhook Redrive handles durable delivery, retries, signatures, and recovery.
 
-Milestones 0 through 6 and the measured follow-ups are complete. The delivery engine has authenticated access, controlled destinations, ingestion idempotency, producer/receiver reference code, audited endpoint maintenance, planned signing rotation, and bounded outage recovery. This is not a production-readiness claim. Investigation is still limited to individual events and dead-letter listing, and data retention remains unbounded.
+Milestones 0 through 7 and the measured follow-ups are complete. The delivery engine has authenticated access, controlled destinations, ingestion idempotency, producer/receiver reference code, audited endpoint maintenance, planned signing rotation, event search, and resumable bulk recovery. This is not a production-readiness claim. Data retention remains unbounded and backup/key recovery has not been demonstrated.
 
-The next priority is operator investigation and bulk recovery. Work through milestones 7 and 8 before further scheduling optimization. Keep one HTTP service, one worker process, and PostgreSQL. These plans do not authorize deployment or access to live systems.
+The next priority is milestone 8: long-running operations and recovery evidence, before further scheduling optimization. Keep one HTTP service, one worker process, and PostgreSQL. These plans do not authorize deployment or access to live systems.
 
 ## 0. Foundation
 
@@ -117,16 +117,18 @@ The [verification record](docs/verification/milestone-6/README.md) includes raw 
 
 ## 7. Operator investigation and bulk recovery
 
-An operator should be able to find failures for an integration and time range, understand their current state, and recover a selected set without writing database queries.
+Implemented with paginated event investigation, optional producer references, fixed failure summaries, and persisted preview/confirmation of selected replay batches. See the [operator commands and runnable recovery demo](docs/operators.md), [decision record](docs/decisions/0008-investigation-recovery.md), and [local verification](docs/verification/milestone-7/README.md).
 
-- [ ] Add paginated event search by endpoint, time range, state, and producer reference
-- [ ] Include terminal failures as well as exhausted deliveries in investigation workflows
-- [ ] Expose safe failure details and next scheduled delivery time without returning credentials or payloads by default
-- [ ] Add bounded bulk replay with a preview of selected events, authenticated actor, reason, and per-event results
-- [ ] Make bulk recovery resumable and idempotent; recheck replay eligibility before creating work and keep dispatch subject to endpoint limits
-- [ ] Provide documented operator commands or a small CLI for search, pause/resume, and recovery
+- [x] Add paginated event search by endpoint, time range, state, and producer reference
+- [x] Include terminal failures as well as exhausted deliveries in investigation workflows
+- [x] Expose safe failure details and next scheduled delivery time without returning credentials or payloads by default
+- [x] Add bounded bulk replay with a preview of selected events, authenticated actor, reason, and per-event results
+- [x] Make bulk recovery resumable and idempotent; recheck replay eligibility before creating work and keep dispatch subject to endpoint limits
+- [x] Provide documented operator commands or a small CLI for search, pause/resume, and recovery
 
-Acceptance evidence: demonstrate finding and recovering a selected outage window. Repeated or interrupted recovery does not create duplicate replay attempts, replay successful events, or bypass endpoint limits. Keep timing thresholds out of CI.
+Acceptance evidence: the Go 1.24 race-enabled PostgreSQL suite and HTTP recovery demo passed. The demo found thirteen terminal failures across three pages, froze a preview, dropped a committed run response, restarted the API/database pool, and resumed without duplicate replay attempts. It skipped an event recovered separately, preserved the failure outside the window, and verified 27 signed unchanged deliveries. Tests cover atomic replay/result rollback, competing previews and batches, per-call bounds, search cursors, authenticated ownership, revocation, redaction, and endpoint pause/rate/concurrency limits. No timing thresholds were added to CI. The existing Compose demo and mixed/fairness delivery checks also passed.
+
+Search is live between pages, not a snapshot export. Recovery freezes 1..100 explicit event/attempt pairs and processes at most ten per authenticated call; nothing runs in the background. Batch completion means scheduling is recorded, not receiver success. Producer references are non-unique metadata, not receiver identity. Retention, large-history performance, and distributed infrastructure were not added.
 
 A dashboard is deferred. Revisit a small operator interface if support staff need these workflows; engineers can start with APIs and commands.
 

@@ -21,6 +21,8 @@ type apiClock struct{ now time.Time }
 func (clock apiClock) Now() time.Time { return clock.now }
 
 type fakeStore struct {
+	batchInput       store.BatchRequest
+	searchFilter     store.EventFilter
 	endpointChange   store.EndpointChange
 	replayInput      store.ReplayRequest
 	endpoint         store.Endpoint
@@ -28,6 +30,21 @@ type fakeStore struct {
 	event            store.Event
 	payload          []byte
 	attemptID        string
+}
+
+func (s *fakeStore) SearchEvents(_ context.Context, f store.EventFilter, _ string, _ int) (store.EventPage, error) {
+	s.searchFilter = f
+	return store.EventPage{Events: []store.Investigation{}}, nil
+}
+func (s *fakeStore) PreviewBatch(_ context.Context, input store.BatchRequest, _ time.Time) (store.ReplayBatch, error) {
+	s.batchInput = input
+	return store.ReplayBatch{}, nil
+}
+func (s *fakeStore) GetBatch(context.Context, string) (store.ReplayBatch, error) {
+	return store.ReplayBatch{}, nil
+}
+func (s *fakeStore) RunBatch(context.Context, string, string, time.Time) (store.ReplayBatch, error) {
+	return store.ReplayBatch{}, nil
 }
 
 func (s *fakeStore) GetEndpoint(context.Context, string) (store.Endpoint, error) {

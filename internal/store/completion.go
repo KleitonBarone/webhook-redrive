@@ -108,8 +108,20 @@ func (s *Store) Replay(ctx context.Context, eventID string, input ReplayRequest,
 		return ReplayResult{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+	result, err := replayTx(ctx, tx, eventID, input, now)
+	if err != nil {
+		return ReplayResult{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return ReplayResult{}, err
+	}
+	return result, nil
+}
+
+// replayTx is shared by single replay and atomic bulk item completion.
+func replayTx(ctx context.Context, tx pgx.Tx, eventID string, input ReplayRequest, now time.Time) (ReplayResult, error) {
 	var endpointID string
-	err = tx.QueryRow(ctx, `SELECT endpoint_id FROM events WHERE id=$1 FOR NO KEY UPDATE`, eventID).Scan(&endpointID)
+	err := tx.QueryRow(ctx, `SELECT endpoint_id FROM events WHERE id=$1 FOR NO KEY UPDATE`, eventID).Scan(&endpointID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ReplayResult{}, ErrNotFound
 	}
@@ -159,9 +171,6 @@ func (s *Store) Replay(ctx context.Context, eventID string, input ReplayRequest,
 		if errors.As(err, &postgresError) && postgresError.Code == "23505" {
 			return ReplayResult{}, ErrConflict
 		}
-		return ReplayResult{}, err
-	}
-	if err := tx.Commit(ctx); err != nil {
 		return ReplayResult{}, err
 	}
 	return ReplayResult{AttemptID: nextID, EventID: eventID, RequestID: input.RequestID}, nil

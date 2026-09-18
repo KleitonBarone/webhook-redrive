@@ -2,7 +2,7 @@
 
 Webhook Redrive accepts events, signs outbound requests, and keeps delivery history in PostgreSQL. It retries temporary failures, retains exhausted deliveries, and supports audited manual replay. One HTTP service and one worker process share one durable database.
 
-Milestones 0 through 6 are implemented. The project targets a small team self-hosting outbound webhook delivery. It includes controlled access, ingestion idempotency, audited endpoint maintenance, signing-key rotation, and bounded outage recovery. It is not a production deployment.
+Milestones 0 through 7 are implemented. The project targets a small team self-hosting outbound webhook delivery. It includes controlled access, ingestion idempotency, audited endpoint maintenance, signing-key rotation, event investigation, and resumable bulk recovery. It is not a production deployment.
 
 ## Run the demo
 
@@ -23,6 +23,8 @@ All seven deliveries must carry valid signatures and identical body bytes. The s
 The script also resubmits each event with the same idempotency key and checks that changed payloads return 409. For business-transaction crash recovery, run the [outbox-to-receiver demo](docs/integration.md#run-the-crash-recovery-demo). It proves one database-local business action after a lost API acknowledgement and duplicate webhook delivery.
 
 It pauses endpoints before ingestion, resumes their queued work, and checks authenticated configuration audit entries. The [lifecycle demo](docs/endpoints.md#run-the-lifecycle-demo) separately exercises signing-key rotation and hours of outage recovery using a controllable clock.
+
+The [operator recovery demo](docs/operators.md#run-the-recovery-demo) finds an outage window, previews a selected set, loses a recovery response, and resumes from a fresh API instance without duplicate replay attempts.
 
 The demo also proves that an ingestion-only credential cannot replay, unapproved destinations are rejected, and a revoked credential stops working. Compose provisions public synthetic credentials through a one-shot initialization job, not an unauthenticated API. Never use these credentials or the demo master key outside local development.
 
@@ -80,6 +82,8 @@ Invoke-RestMethod -Headers $headers "http://localhost:8080/v1/dead-letters"
 ```
 
 History exposes attempt number, cycle attempt, scheduled time, claim count, retry classification, response status, and replay audit fields. Event state follows the latest attempt. The dead-letter list returns at most 100 events; pass its `next_after` value as `?after=...` for the next page.
+
+`GET /v1/events` searches by endpoint, acceptance-time range, latest state, and exact producer reference. `state=recoverable` includes terminal failures and dead letters. Producers can optionally send `X-Producer-Reference`; keyed retries must preserve it. Search returns fixed failure summaries and pending scheduled times, without payloads or credentials. Follow the [operator commands](docs/operators.md) to select up to 100 event/attempt pairs, persist a replay preview, and confirm recovery in resumable ten-item chunks. Recovery records the authenticated creator and per-event results, rechecks eligibility, and preserves normal worker limits.
 
 To replay a failed or exhausted event:
 
@@ -144,9 +148,11 @@ Migration 005 adds scoped ingestion keys without changing existing events. The p
 
 Migration 006 adds endpoint versions, configuration audit, rotation metadata, and retry-policy snapshots. Existing cycles keep their former policy and no retroactive deadline; new ingestion and explicit replay receive finite deadlines. Upgrade all API/worker binaries together. [Lifecycle decisions](docs/decisions/0007-endpoint-lifecycle.md) define claim boundaries, rotation overlap, and compatibility.
 
+Migration 007 adds optional producer references, search indexes, and durable bulk-recovery audit. Existing unreferenced ingestion keys remain compatible. Batch progress and referenced history are retained without automatic cleanup. See [investigation and recovery decisions](docs/decisions/0008-investigation-recovery.md).
+
 ## Next steps
 
-Next is milestone 7: event search, investigation details, and bounded, resumable bulk replay. Retention and long-running recovery operations follow. Fair scheduling remains deferred. Existing [load measurements](docs/benchmarks/sustained/README.md) predate authentication and are not production capacity claims. See [ROADMAP.md](ROADMAP.md).
+Next is milestone 8: coordinated retention, database/key recovery, readiness, alerting, and longer-running operational evidence. Fair scheduling remains deferred. Existing [load measurements](docs/benchmarks/sustained/README.md) predate authentication and are not production capacity claims. See [ROADMAP.md](ROADMAP.md).
 
 ## License
 

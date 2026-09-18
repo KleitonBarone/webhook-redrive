@@ -2,6 +2,8 @@
 
 Status: accepted on 2026-09-17.
 
+Milestone 7 adds optional producer references to keyed request identity while preserving fingerprints for requests without references. See [investigation and recovery](0008-investigation-recovery.md).
+
 ## Ingestion identity
 
 An optional `Idempotency-Key` scopes a submission to the authenticated principal ID and endpoint ID. Credential rotation within the same principal preserves the scope. A different principal or endpoint starts a different scope. Without a key, each request creates a new event as before.

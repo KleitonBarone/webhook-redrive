@@ -43,6 +43,8 @@ jobs:
         run: go test -race -count=1 -v ./internal/integration -run '^TestOutboxToReceiverDemo$'
       - name: Demonstrate endpoint lifecycle and outage recovery
         run: go test -race -count=1 -v ./internal/integration -run '^TestEndpointLifecycleDemo$'
+      - name: Demonstrate investigation and interrupted bulk recovery
+        run: go test -race -count=1 -v ./internal/integration -run '^TestInvestigationRecoveryDemo$'
 
   demo:
     runs-on: ubuntu-latest

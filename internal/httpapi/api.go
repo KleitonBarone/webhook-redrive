@@ -41,6 +41,10 @@ type dataStore interface {
 	ListAttempts(context.Context, string) ([]store.Attempt, error)
 	Replay(context.Context, string, store.ReplayRequest, time.Time) (store.ReplayResult, error)
 	ListDeadLetters(context.Context, string) ([]store.Event, error)
+	SearchEvents(context.Context, store.EventFilter, string, int) (store.EventPage, error)
+	PreviewBatch(context.Context, store.BatchRequest, time.Time) (store.ReplayBatch, error)
+	GetBatch(context.Context, string) (store.ReplayBatch, error)
+	RunBatch(context.Context, string, string, time.Time) (store.ReplayBatch, error)
 }
 
 type API struct {
@@ -74,6 +78,10 @@ func New(dataStore dataStore, box *secret.Box, serviceClock clock.Clock, logger 
 	mux.HandleFunc("GET /v1/events/{eventID}/attempts", api.require(auth.Inspect, api.listAttempts))
 	mux.HandleFunc("POST /v1/events/{eventID}/replays", api.require(auth.Replay, api.traced("webhook.replay", api.replay)))
 	mux.HandleFunc("GET /v1/dead-letters", api.require(auth.Inspect, api.deadLetters))
+	mux.HandleFunc("GET /v1/events", api.require(auth.Inspect, api.searchEvents))
+	mux.HandleFunc("POST /v1/replay-batches", api.require(auth.Replay, api.previewBatch))
+	mux.HandleFunc("GET /v1/replay-batches/{batchID}", api.require(auth.Inspect, api.getBatch))
+	mux.HandleFunc("POST /v1/replay-batches/{batchID}/run", api.require(auth.Replay, api.runBatch))
 	return api.logRequests(mux)
 }
 
@@ -131,6 +139,12 @@ func (a *API) createEvent(w http.ResponseWriter, request *http.Request) {
 		return
 	}
 	keys := request.Header.Values("Idempotency-Key")
+	references := request.Header.Values("X-Producer-Reference")
+	reference := request.Header.Get("X-Producer-Reference")
+	if len(references) > 1 || len(references) == 1 && !store.ValidIdempotencyKey(reference) {
+		writeError(w, http.StatusBadRequest, "X-Producer-Reference must contain 1..128 ASCII letters, digits, dots, colons, underscores or hyphens")
+		return
+	}
 	key := request.Header.Get("Idempotency-Key")
 	if len(keys) > 1 || len(keys) == 1 && !store.ValidIdempotencyKey(key) {
 		writeError(w, http.StatusBadRequest, "Idempotency-Key must contain 1..128 ASCII letters, digits, dots, colons, underscores or hyphens")
@@ -161,7 +175,8 @@ func (a *API) createEvent(w http.ResponseWriter, request *http.Request) {
 		return
 	}
 	event := store.Event{
-		ID: eventID, EndpointID: endpointID, EventType: eventType,
+		ProducerReference: reference,
+		ID:                eventID, EndpointID: endpointID, EventType: eventType,
 		State: "pending", CreatedAt: a.clock.Now(),
 	}
 	receipt, err := a.store.IngestEvent(ctx, event, payload, attemptID, auth.FromContext(ctx).ID, key)

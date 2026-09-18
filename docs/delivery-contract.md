@@ -73,6 +73,8 @@ Pause blocks new claims but still permits durable ingestion and replay. Already-
 
 Replay does not erase the original failure. `GET /v1/dead-letters` lists events whose latest attempt is exhausted or expired; a replay removes the event from that list while preserving its dead-letter row in history. Rows created before migration 004 retain unverified actor labels and have no `replay_principal_id`. New API requests reject `actor`; only the authenticated principal supplies attribution.
 
+[Bulk recovery](operators.md) previews up to 100 explicit event/attempt pairs and confirms at most ten items per call. Each replay and its per-event result commit together under the same event lock as single replay. Repeated or interrupted calls resume the frozen batch, recheck current eligibility, and skip changed or unapproved selections. Only the creating principal can confirm or resume. `completed` describes scheduling decisions, not receiver success. Pause, limits, current-policy deadlines, and at-least-once delivery remain unchanged.
+
 ## Access and destination policy
 
 Ingestion, inspection, endpoint administration, replay, and metrics each require their permission. Credential revocation prevents new authenticated requests; it does not cancel already-accepted events or requests authorized before revocation. Permissions are instance-wide.

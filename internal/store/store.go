@@ -40,11 +40,12 @@ type Endpoint struct {
 }
 
 type Event struct {
-	ID         string    `json:"id"`
-	EndpointID string    `json:"endpoint_id"`
-	EventType  string    `json:"event_type"`
-	State      string    `json:"state"`
-	CreatedAt  time.Time `json:"created_at"`
+	ProducerReference string    `json:"producer_reference,omitempty"`
+	ID                string    `json:"id"`
+	EndpointID        string    `json:"endpoint_id"`
+	EventType         string    `json:"event_type"`
+	State             string    `json:"state"`
+	CreatedAt         time.Time `json:"created_at"`
 }
 
 type Attempt struct {
@@ -221,8 +222,8 @@ func (s *Store) CreateEvent(ctx context.Context, event Event, payload []byte, at
 
 func insertEvent(ctx context.Context, tx pgx.Tx, event Event, payload []byte, attemptID string) error {
 	if _, err := tx.Exec(ctx, `
-		INSERT INTO events (id, endpoint_id, event_type, payload, created_at)
-		VALUES ($1, $2, $3, $4, $5)`, event.ID, event.EndpointID, event.EventType, payload, event.CreatedAt); err != nil {
+		INSERT INTO events (id, endpoint_id, event_type, payload, created_at,producer_reference)
+		VALUES ($1, $2, $3, $4, $5,$6)`, event.ID, event.EndpointID, event.EventType, payload, event.CreatedAt, event.ProducerReference); err != nil {
 		return fmt.Errorf("insert event: %w", err)
 	}
 	if _, err := tx.Exec(ctx, `
@@ -247,11 +248,11 @@ func (s *Store) EndpointExists(ctx context.Context, endpointID string) (bool, er
 func (s *Store) GetEvent(ctx context.Context, eventID string) (Event, error) {
 	var event Event
 	err := s.pool.QueryRow(ctx, `
-		SELECT event.id, event.endpoint_id, event.event_type, attempt.state, event.created_at
+		SELECT event.id, event.endpoint_id, event.event_type, attempt.state, event.created_at,event.producer_reference
 		FROM events AS event
 		JOIN delivery_attempts AS attempt ON attempt.event_id = event.id
 		WHERE event.id = $1 ORDER BY attempt.attempt_number DESC LIMIT 1`, eventID).Scan(
-		&event.ID, &event.EndpointID, &event.EventType, &event.State, &event.CreatedAt,
+		&event.ID, &event.EndpointID, &event.EventType, &event.State, &event.CreatedAt, &event.ProducerReference,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Event{}, ErrNotFound

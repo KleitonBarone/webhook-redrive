@@ -25,6 +25,8 @@ For the broader API demo, run `docker compose up --build -d --wait` followed by 
 
 Send `Idempotency-Key` with the usual bearer credential, `X-Event-Type`, and exact JSON body. Generate the key once for the business event, then persist it with the body before sending.
 
+Optional `X-Producer-Reference` supplies immutable, non-unique metadata for [operator search](operators.md). It has the same character and length rules as an ingestion key, but does not deduplicate events. Persist it with the request and preserve it on keyed retries. Adding, changing, or removing a reference under an existing key returns 409. Existing requests without references keep their original fingerprints. References are visible to inspectors, absent from telemetry, and not sent to receivers.
+
 | Case | Result |
 | --- | --- |
 | New key under the same principal and endpoint | 202 after key, event, and first attempt commit |
