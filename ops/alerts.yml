@@ -1,0 +1,31 @@
+groups:
+  - name: webhook-redrive
+    rules:
+      - alert: WebhookOldestReady
+        expr: webhook_oldest_ready_seconds > 300
+        for: 5m
+        labels: {severity: warning}
+      - alert: WebhookExhausted
+        expr: webhook_events{state="dead_letter"} > 0
+        for: 5m
+        labels: {severity: warning}
+      - alert: WebhookWorkersStalled
+        expr: (webhook_workers_recent == 0) and on(job, instance) (webhook_oldest_ready_seconds > 60)
+        for: 2m
+        labels: {severity: critical}
+      - alert: WebhookDeliveryStalled
+        expr: (increase(webhook_claims_total[5m]) == 0) and on(job, instance) (webhook_oldest_ready_seconds > 300)
+        for: 5m
+        labels: {severity: critical}
+      - alert: WebhookDatabaseOrScrapeUnavailable
+        expr: up{job="webhook"} == 0
+        for: 2m
+        labels: {severity: critical}
+      - alert: WebhookStorageBudget
+        expr: webhook_database_bytes > 10737418240
+        for: 15m
+        labels: {severity: warning}
+      - alert: WebhookStorageGrowth
+        expr: deriv(webhook_database_bytes[1h]) > 1048576
+        for: 15m
+        labels: {severity: warning}

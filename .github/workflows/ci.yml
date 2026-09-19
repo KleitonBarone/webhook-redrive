@@ -45,6 +45,23 @@ jobs:
         run: go test -race -count=1 -v ./internal/integration -run '^TestEndpointLifecycleDemo$'
       - name: Demonstrate investigation and interrupted bulk recovery
         run: go test -race -count=1 -v ./internal/integration -run '^TestInvestigationRecoveryDemo$'
+      - name: Verify migration and larger retained history
+        run: MEASURE_HISTORY=true go test -race -count=1 -v ./internal/store -run TestOperations
+      - name: Test operational alert rules
+        run: docker run --rm -v "$PWD/ops:/rules" -w /rules --entrypoint promtool prom/prometheus:v3.7.3 test rules alerts.test.yml
+
+  recovery:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start isolated recovery source with two workers
+        run: docker compose -p webhook-redrive-recovery-ci up --build -d --wait --scale worker=2
+      - name: Restore database and rotate wrapping key
+        shell: pwsh
+        run: ./scripts/recovery-demo.ps1 -SourceProject webhook-redrive-recovery-ci
+      - name: Stop source stack
+        if: always()
+        run: docker compose -p webhook-redrive-recovery-ci stop
 
   demo:
     runs-on: ubuntu-latest

@@ -21,6 +21,7 @@ type apiClock struct{ now time.Time }
 func (clock apiClock) Now() time.Time { return clock.now }
 
 type fakeStore struct {
+	readinessError   error
 	batchInput       store.BatchRequest
 	searchFilter     store.EventFilter
 	endpointChange   store.EndpointChange
@@ -31,6 +32,8 @@ type fakeStore struct {
 	payload          []byte
 	attemptID        string
 }
+
+func (s *fakeStore) Ready(context.Context) error { return s.readinessError }
 
 func (s *fakeStore) SearchEvents(_ context.Context, f store.EventFilter, _ string, _ int) (store.EventPage, error) {
 	s.searchFilter = f

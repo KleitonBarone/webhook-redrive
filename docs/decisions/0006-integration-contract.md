@@ -16,7 +16,7 @@ Migration 005 introduces a unique key per principal and endpoint. `INSERT ... ON
 
 A matching retry returns HTTP 202 with the original event ID, creation time, type, endpoint, and initial `pending` state. This is a stable acceptance receipt, not current delivery state. `Idempotency-Replayed` distinguishes a repeat from a new keyed acceptance. Use event inspection for current state. A fingerprint mismatch returns 409 without creating work. Repeated acceptance uses the original IDs in telemetry and does not change attempt trace context or database-derived event counters.
 
-Keys have no time-based expiry in this milestone. They remain reserved as long as event history is retained; no history or key cleanup exists. Foreign keys prevent deleting referenced events without an explicit retention design. Milestone 8 must define cleanup and deduplication expiry together. This favors safe long-outage retries over bounded storage for now.
+Keys have no time-based expiry in milestone 5. They remain reserved as long as event history is retained. Milestone 8's [operations decision](0009-operations.md) now defines coordinated opt-in cleanup and deduplication expiry; it supersedes the original no-cleanup policy. Foreign keys and event locks protect referenced history.
 
 ## Business transaction boundary
 

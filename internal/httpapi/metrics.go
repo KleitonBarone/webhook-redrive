@@ -29,6 +29,17 @@ func (c snapshotCollector) Describe(ch chan<- *prometheus.Desc) { prometheus.Des
 
 func (c snapshotCollector) Collect(ch chan<- prometheus.Metric) {
 	m := c.snapshot
+	for _, gauge := range []struct {
+		name, help string
+		value      float64
+	}{
+		{"workers_recent", "Workers with a committed poll in the last minute.", float64(m.WorkersRecent)},
+		{"worker_poll_age_seconds", "Age of most recent committed worker poll; zero if none.", m.WorkerPollAgeSeconds},
+		{"worker_completion_age_seconds", "Age of most recent worker completion; zero if none.", m.WorkerCompletionAgeSeconds},
+		{"database_bytes", "PostgreSQL database size, including indexes and other schemas.", float64(m.DatabaseBytes)},
+	} {
+		ch <- prometheus.MustNewConstMetric(prometheus.NewDesc("webhook_"+gauge.name, gauge.help, nil, nil), prometheus.GaugeValue, gauge.value)
+	}
 	for _, metric := range []struct {
 		name, help string
 		value      int64

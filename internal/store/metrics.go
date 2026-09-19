@@ -2,8 +2,6 @@ package store
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -18,20 +16,24 @@ type Histogram struct {
 }
 
 type MetricsSnapshot struct {
-	Events             int64
-	Claims             int64
-	Recoveries         int64
-	Retries            int64
-	Replays            int64
-	Queue              map[string]int64
-	States             map[string]int64
-	Completed          map[string]int64
-	OldestReadySeconds float64
-	Latency            map[string]Histogram
+	WorkersRecent              int64
+	WorkerPollAgeSeconds       float64
+	WorkerCompletionAgeSeconds float64
+	DatabaseBytes              int64
+	Events                     int64
+	Claims                     int64
+	Recoveries                 int64
+	Retries                    int64
+	Replays                    int64
+	Queue                      map[string]int64
+	States                     map[string]int64
+	Completed                  map[string]int64
+	OldestReadySeconds         float64
+	Latency                    map[string]Histogram
 }
 
-// Metrics reads one consistent committed snapshot. Its cost grows with retained
-// history; the HTTP caller supplies a deadline and never serves stale zeroes.
+// Metrics reads transactional cumulative totals and retained-state gauges from
+// one snapshot. The HTTP caller supplies a deadline, never stale zeroes.
 func (s *Store) Metrics(ctx context.Context, now time.Time) (MetricsSnapshot, error) {
 	m := MetricsSnapshot{Queue: map[string]int64{}, States: map[string]int64{}, Completed: map[string]int64{}, Latency: map[string]Histogram{}}
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
@@ -44,14 +46,12 @@ func (s *Store) Metrics(ctx context.Context, now time.Time) (MetricsSnapshot, er
         count(*) FILTER (WHERE NOT e.paused AND state='pending' AND available_at > $1),
         count(*) FILTER (WHERE state='in_progress' AND lease_until > $1),
         count(*) FILTER (WHERE NOT e.paused AND state='in_progress' AND lease_until <= $1),
-        coalesce(sum(claim_count),0), coalesce(sum(greatest(claim_count-1,0)),0),
-        count(*) FILTER (WHERE cycle_attempt > 1), count(*) FILTER (WHERE replay_of IS NOT NULL),
         coalesce(max(greatest(0,extract(epoch FROM $1::timestamptz -
             CASE WHEN state='in_progress' THEN lease_until ELSE available_at END))) FILTER
             (WHERE NOT e.paused AND ((state='pending' AND available_at <= $1) OR (state='in_progress' AND lease_until <= $1))),0),
         count(*) FILTER (WHERE e.paused AND (state='pending' OR (state='in_progress' AND lease_until <= $1)))
-        FROM delivery_attempts a JOIN webhook_endpoints e ON e.id=a.endpoint_id`, now).Scan(&ready, &scheduled, &active, &expired,
-		&m.Claims, &m.Recoveries, &m.Retries, &m.Replays, &m.OldestReadySeconds, &paused)
+        FROM delivery_attempts a JOIN webhook_endpoints e ON e.id=a.endpoint_id WHERE a.state IN ('pending','in_progress')`, now).Scan(&ready, &scheduled, &active, &expired,
+		&m.OldestReadySeconds, &paused)
 	if err != nil {
 		return m, err
 	}
@@ -70,62 +70,36 @@ func (s *Store) Metrics(ctx context.Context, now time.Time) (MetricsSnapshot, er
 			return m, err
 		}
 		m.States[state] = count
-		m.Events += count
 	}
 	if err := rows.Err(); err != nil {
 		return m, err
 	}
 	rows.Close()
-	rows, err = tx.Query(ctx, `SELECT state,count(*) FROM delivery_attempts WHERE completed_at IS NOT NULL GROUP BY state`)
+	var succeeded, failed, dead int64
+	var count uint64
+	var attemptSum, queueSum float64
+	var attemptBuckets, queueBuckets []int64
+	err = tx.QueryRow(ctx, `SELECT events,claims,recoveries,retries,replays,succeeded,failed,dead_letter,latency_count,attempt_sum,queue_sum,attempt_buckets,queue_buckets FROM cumulative_metrics`).Scan(&m.Events, &m.Claims, &m.Recoveries, &m.Retries, &m.Replays, &succeeded, &failed, &dead, &count, &attemptSum, &queueSum, &attemptBuckets, &queueBuckets)
 	if err != nil {
 		return m, err
 	}
-	for rows.Next() {
-		var state string
-		var count int64
-		if err := rows.Scan(&state, &count); err != nil {
-			rows.Close()
-			return m, err
-		}
-		m.Completed[state] = count
-	}
-	if err := rows.Err(); err != nil {
-		return m, err
-	}
-	rows.Close()
-	// Fixed boundaries, not caller input. Aggregate in PostgreSQL rather than
-	// copying every historical attempt into the API process on each scrape.
-	var filters []string
-	for _, boundary := range LatencyBuckets {
-		filters = append(filters, fmt.Sprintf("count(*) FILTER (WHERE seconds <= %g)", boundary))
-	}
-	rows, err = tx.Query(ctx, `SELECT kind,count(*),coalesce(sum(seconds),0),ARRAY[`+strings.Join(filters, ",")+`] FROM (
-        SELECT 'attempt' AS kind, greatest(0,extract(epoch FROM completed_at-last_started_at)) AS seconds
-        FROM delivery_attempts WHERE completed_at IS NOT NULL AND last_started_at IS NOT NULL
-        UNION ALL
-        SELECT 'queue',greatest(0,extract(epoch FROM last_started_at-available_at))
-        FROM delivery_attempts WHERE completed_at IS NOT NULL AND last_started_at IS NOT NULL
-        ) durations GROUP BY kind`)
-	if err != nil {
-		return m, err
-	}
-	for rows.Next() {
-		var kind string
-		var h Histogram
-		var buckets []int64
-		if err := rows.Scan(&kind, &h.Count, &h.Sum, &buckets); err != nil {
-			rows.Close()
-			return m, err
-		}
-		h.Buckets = map[float64]uint64{}
-		for i, value := range buckets {
+	m.Completed = map[string]int64{"succeeded": succeeded, "failed": failed, "dead_letter": dead}
+	for _, sample := range []struct {
+		kind    string
+		sum     float64
+		buckets []int64
+	}{{"attempt", attemptSum, attemptBuckets}, {"queue", queueSum, queueBuckets}} {
+		h := Histogram{Count: count, Sum: sample.sum, Buckets: map[float64]uint64{}}
+		for i, value := range sample.buckets {
 			h.Buckets[LatencyBuckets[i]] = uint64(value)
 		}
-		m.Latency[kind] = h
+		m.Latency[sample.kind] = h
 	}
-	if err := rows.Err(); err != nil {
+	err = tx.QueryRow(ctx, `SELECT count(*) FILTER(WHERE polled_at > $1::timestamptz-interval '1 minute'),
+	coalesce(greatest(0,extract(epoch FROM $1::timestamptz-max(polled_at))),0),
+	coalesce(greatest(0,extract(epoch FROM $1::timestamptz-max(completed_at))),0),pg_database_size(current_database()) FROM worker_progress`, now).Scan(&m.WorkersRecent, &m.WorkerPollAgeSeconds, &m.WorkerCompletionAgeSeconds, &m.DatabaseBytes)
+	if err != nil {
 		return m, err
 	}
-	rows.Close()
 	return m, tx.Commit(ctx)
 }

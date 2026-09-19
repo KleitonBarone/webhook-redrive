@@ -1,0 +1,7 @@
+=== RUN   TestOperationsMigrationBackfillsMetrics
+--- PASS: TestOperationsMigrationBackfillsMetrics (0.37s)
+=== RUN   TestOperationsLargeHistory
+    operations_integration_test.go:171: {"database_bytes":28612275,"metrics_seconds":0.022912774,"remaining_events":9900,"retention_100_seconds":0.647191577,"search_page_seconds":0.004110196,"seed_seconds":5.385847775,"seeded_events":10000}
+--- PASS: TestOperationsLargeHistory (6.54s)
+PASS
+ok  	github.com/KleitonBarone/webhook-redrive/internal/store	7.929s

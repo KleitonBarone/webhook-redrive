@@ -2,6 +2,8 @@
 
 Status: accepted on 2026-09-10.
 
+Milestone 8 supersedes the history-derived cumulative accounting and adds optional OTLP export. See [operations decisions](0009-operations.md). The original tradeoffs below describe milestone 3.
+
 ## Traces
 
 Use the OpenTelemetry Go SDK with explicit spans and its stdout exporter. The default is `TRACE_EXPORTER=stdout`; `none` disables export while retaining trace IDs and propagation. This demo needs no collector, trace database, or dashboard. An OTLP exporter can be added when there is a backend to receive it.

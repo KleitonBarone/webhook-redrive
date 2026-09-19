@@ -30,4 +30,4 @@ The replay attempt, principal/reason attribution, item result, and batch start c
 
 ## Retention and upgrade
 
-Migration 007 adds references, search indexes, and batch audit tables without rewriting delivery history. Stop API and workers together before upgrading. There is no cleanup, batch cancellation, background executor, or new service. An abandoned preview creates no deliveries. Batch audit, referenced attempts, payload retention, and ingestion-key expiry must be designed together in milestone 8. History-derived metrics remain unchanged because batch execution uses ordinary replay attempts.
+Migration 007 adds references, search indexes, and batch audit tables without rewriting delivery history. Stop API and workers together before upgrading. It adds no cleanup, batch cancellation, background executor, or new service. An abandoned preview creates no deliveries. Milestone 8's [operations decision](0009-operations.md) now defines batch audit retention with referenced history and key expiry, and replaces history-derived cumulative metrics. Batch execution still uses ordinary replay attempts.

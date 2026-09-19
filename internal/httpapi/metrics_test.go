@@ -42,7 +42,7 @@ func TestMetricsExposeBoundedLabelsAndFailClosed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(families) != 11 || families["webhook_events_accepted_total"].Metric[0].Counter.GetValue() != 3 {
+	if len(families) != 15 || families["webhook_events_accepted_total"].Metric[0].Counter.GetValue() != 3 {
 		t.Fatalf("families=%v", families)
 	}
 	for _, family := range families {

@@ -70,6 +70,9 @@ func run(logger *slog.Logger) error {
 	if err := dataStore.Migrate(ctx, serviceClock.Now()); err != nil {
 		return err
 	}
+	if err := dataStore.CheckMasterKey(ctx, box); err != nil {
+		return err
+	}
 
 	server := &http.Server{
 		Addr:              config.String("API_ADDR", ":8080"),

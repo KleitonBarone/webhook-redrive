@@ -41,7 +41,7 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/readyz"]
       interval: 2s
       timeout: 2s
       retries: 15

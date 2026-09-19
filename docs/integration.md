@@ -39,7 +39,7 @@ Keys contain 1..128 ASCII letters, digits, dots, colons, underscores, or hyphens
 
 The `Idempotency-Replayed` response header is `false` for a new keyed acceptance and `true` for an identical retry. Both responses include the original `id`, `endpoint_id`, `event_type`, `created_at`, and initial `state: pending`. The state is an acceptance receipt, not live status; inspect `GET /v1/events/{id}` for that. Retrying ingestion never replays an exhausted event.
 
-Keys remain reserved for the lifetime of retained event history, with no time-based expiry or cleanup today. Do not reuse them for new business events. Keep the same principal through credential rotation; changing principals changes key scope. The future retention policy must define any deduplication expiry before removing history.
+Keys remain reserved for the lifetime of retained event history. Opt-in administrator cleanup deletes an eligible terminal event and its keys atomically; see [retention and replay lifetime](operations.md#retention-and-replay-lifetime). After deletion, reusing a key can create a new event. A request racing receipt deletion can return 409 requiring reconciliation. Do not reuse keys for new business events or blindly retry beyond your agreed retention horizon. Keep the same principal through credential rotation; changing principals changes key scope.
 
 ## Copy the transaction boundaries
 

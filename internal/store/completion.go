@@ -80,6 +80,9 @@ func (s *Store) Complete(ctx context.Context, claim ClaimedDelivery, workerID st
 			return false, fmt.Errorf("schedule retry: %w", err)
 		}
 	}
+	if _, err := tx.Exec(ctx, `UPDATE worker_progress SET completed_at=$2 WHERE worker_id=$1`, workerID, now); err != nil {
+		return false, err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return false, err
 	}

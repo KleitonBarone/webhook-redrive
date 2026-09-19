@@ -1,0 +1,61 @@
+rule_files: [alerts.yml]
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'webhook_oldest_ready_seconds{job="webhook",instance="api"}'
+        values: '600+0x60'
+      - series: 'webhook_workers_recent{job="webhook",instance="api"}'
+        values: '0+0x60'
+      - series: 'webhook_claims_total{job="webhook",instance="api"}'
+        values: '10+0x60'
+      - series: 'webhook_events{job="webhook",instance="api",state="dead_letter"}'
+        values: '2+0x60'
+      - series: 'up{job="webhook",instance="api"}'
+        values: '0+0x60'
+      - series: 'webhook_database_bytes{job="webhook",instance="api"}'
+        values: '11000000000+120000000x60'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: WebhookOldestReady
+        exp_alerts: [{exp_labels: {job: webhook, instance: api, severity: warning}}]
+      - eval_time: 20m
+        alertname: WebhookExhausted
+        exp_alerts: [{exp_labels: {job: webhook, instance: api, state: dead_letter, severity: warning}}]
+      - eval_time: 20m
+        alertname: WebhookWorkersStalled
+        exp_alerts: [{exp_labels: {job: webhook, instance: api, severity: critical}}]
+      - eval_time: 20m
+        alertname: WebhookDeliveryStalled
+        exp_alerts: [{exp_labels: {job: webhook, instance: api, severity: critical}}]
+      - eval_time: 20m
+        alertname: WebhookDatabaseOrScrapeUnavailable
+        exp_alerts: [{exp_labels: {job: webhook, instance: api, severity: critical}}]
+      - eval_time: 20m
+        alertname: WebhookStorageBudget
+        exp_alerts: [{exp_labels: {job: webhook, instance: api, severity: warning}}]
+      - eval_time: 20m
+        alertname: WebhookStorageGrowth
+        exp_alerts: [{exp_labels: {job: webhook, instance: api, severity: warning}}]
+  - interval: 1m
+    input_series:
+      - series: 'webhook_oldest_ready_seconds{job="webhook",instance="api"}'
+        values: '0+0x60'
+      - series: 'webhook_workers_recent{job="webhook",instance="api"}'
+        values: '0+0x60'
+      - series: 'webhook_claims_total{job="webhook",instance="api"}'
+        values: '0+0x60'
+      - series: 'webhook_events{job="webhook",instance="api",state="dead_letter"}'
+        values: '0+0x60'
+      - series: 'up{job="webhook",instance="api"}'
+        values: '1+0x60'
+      - series: 'webhook_database_bytes{job="webhook",instance="api"}'
+        values: '100000+0x60'
+    alert_rule_test:
+      - {eval_time: 20m, alertname: WebhookOldestReady, exp_alerts: []}
+      - {eval_time: 20m, alertname: WebhookExhausted, exp_alerts: []}
+      - {eval_time: 20m, alertname: WebhookWorkersStalled, exp_alerts: []}
+      - {eval_time: 20m, alertname: WebhookDeliveryStalled, exp_alerts: []}
+      - {eval_time: 20m, alertname: WebhookDatabaseOrScrapeUnavailable, exp_alerts: []}
+      - {eval_time: 20m, alertname: WebhookStorageBudget, exp_alerts: []}
+      - {eval_time: 20m, alertname: WebhookStorageGrowth, exp_alerts: []}

@@ -9,9 +9,11 @@ import (
 	"time"
 
 	"github.com/KleitonBarone/webhook-redrive/internal/id"
+	"github.com/jackc/pgx/v5"
 )
 
 var ErrIdempotencyConflict = errors.New("idempotency key conflicts with accepted event")
+var ErrIdempotencyExpired = errors.New("idempotency receipt expired during request")
 
 // IngestionReceipt is the original acceptance, not the event's current state.
 type IngestionReceipt struct {
@@ -78,6 +80,9 @@ func (s *Store) IngestEvent(ctx context.Context, event Event, payload []byte, at
             FROM ingestion_keys k JOIN events e ON e.id=k.event_id
             WHERE k.principal_id=$1 AND k.endpoint_id=$2 AND k.key_hash=$3`, principalID, event.EndpointID, keyHash[:]).Scan(
 			&originalHash, &receipt.Event.ID, &receipt.Event.EndpointID, &receipt.Event.EventType, &receipt.Event.CreatedAt, &receipt.AttemptID, &receipt.Event.ProducerReference)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return IngestionReceipt{}, ErrIdempotencyExpired
+		}
 		if err != nil {
 			return IngestionReceipt{}, err
 		}

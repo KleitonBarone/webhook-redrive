@@ -2,7 +2,7 @@
 
 Webhook Redrive accepts events, signs outbound requests, and keeps delivery history in PostgreSQL. It retries temporary failures, retains exhausted deliveries, and supports audited manual replay. One HTTP service and one worker process share one durable database.
 
-Milestones 0 through 7 are implemented. The project targets a small team self-hosting outbound webhook delivery. It includes controlled access, ingestion idempotency, audited endpoint maintenance, signing-key rotation, event investigation, and resumable bulk recovery. It is not a production deployment.
+Milestones 0 through 8 are implemented. The project targets a small team self-hosting outbound webhook delivery. It includes controlled access, ingestion idempotency, audited endpoint maintenance, event investigation, resumable bulk recovery, opt-in retention, and database/key recovery procedures. It is not a production deployment.
 
 ## Run the demo
 
@@ -25,6 +25,8 @@ The script also resubmits each event with the same idempotency key and checks th
 It pauses endpoints before ingestion, resumes their queued work, and checks authenticated configuration audit entries. The [lifecycle demo](docs/endpoints.md#run-the-lifecycle-demo) separately exercises signing-key rotation and hours of outage recovery using a controllable clock.
 
 The [operator recovery demo](docs/operators.md#run-the-recovery-demo) finds an outage window, previews a selected set, loses a recovery response, and resumes from a fresh API instance without duplicate replay attempts.
+
+The [database recovery drill](docs/operations.md#run-the-synthetic-recovery-drill) performs a real PostgreSQL dump/restore into a fresh local project, rotates the wrapping key, preserves history and ingestion receipts, and resumes signed pending delivery. [Operations](docs/operations.md) covers retention, backups, key custody, upgrades, readiness, and alert runbooks.
 
 The demo also proves that an ingestion-only credential cannot replay, unapproved destinations are rejected, and a revoked credential stops working. Compose provisions public synthetic credentials through a one-shot initialization job, not an unauthenticated API. Never use these credentials or the demo master key outside local development.
 
@@ -101,7 +103,7 @@ Replay requires the current `failed` or `dead_letter` attempt. It preserves the 
 
 ## Access and approved destinations
 
-Every API operation except `/healthz` requires a bearer credential. Fixed permissions cover ingestion, inspection, endpoint administration, replay, and metrics. Permissions are instance-wide, not tenant or endpoint isolation. PostgreSQL stores credential hashes and revocation state; `cmd/admin` provisions and revokes credentials using database access.
+Every business API operation and `/metrics` requires a bearer credential. Public `/healthz` checks process liveness; `/readyz` checks database connectivity with a one-second deadline. Fixed permissions cover ingestion, inspection, endpoint administration, replay, and metrics. Permissions are instance-wide, not tenant or endpoint isolation. PostgreSQL stores credential hashes and revocation state; `cmd/admin` provisions and revokes credentials using database access.
 
 API and worker require the same destination-policy file. Compose approves only `http://receiver:9090` with explicit Docker private-network exceptions. The worker checks resolved addresses at connection time, refuses redirects and environment proxies, and records a terminal `destination_denied` failure for blocked destinations. See [security setup](docs/security.md) for credential commands, TLS requirements, policy examples, and upgrade instructions.
 
@@ -136,7 +138,7 @@ go test -race -count=1 ./...
 
 The race detector requires CGO and a C compiler. Tests create and drop uniquely named schemas; the test database role needs permission to create schemas. Existing demo tables are not truncated. Integration tests skip when the URL is absent locally and fail if it is absent in CI.
 
-The API and worker require `DATABASE_URL`, `MASTER_KEY` as a base64-encoded 32-byte AES key, and `DESTINATION_POLICY_FILE`. Compose supplies synthetic local values and a mounted demo policy. Worker defaults are `OUTBOUND_TIMEOUT=2s`, `CLAIM_LEASE=10s`, `POLL_PERIOD=250ms`, and `BATCH_SIZE=10`. The lease must exceed the request timeout; batch size must be 1..1000. `API_ADDR` defaults to `:8080`. Both processes export OpenTelemetry spans to stdout by default; set `TRACE_EXPORTER=none` to disable export.
+The API and worker require `DATABASE_URL`, `MASTER_KEY` as a base64-encoded 32-byte AES key, and `DESTINATION_POLICY_FILE`. Startup rejects a key that does not match the database. Compose supplies synthetic local values and a mounted demo policy. Worker defaults are `OUTBOUND_TIMEOUT=2s`, `CLAIM_LEASE=10s`, `POLL_PERIOD=250ms`, and `BATCH_SIZE=10`. The lease must exceed the request timeout; batch size must be 1..1000. `API_ADDR` defaults to `:8080`. Both processes export OpenTelemetry spans to stdout by default; set `TRACE_EXPORTER=none` to disable export, or `otlp` with an explicit collector endpoint as described in [telemetry setup](docs/observability.md).
 
 `BATCH_SIZE` bounds in-flight deliveries per worker. Each completion frees a slot for another claim; a slow request does not hold a whole batch open. `POLL_PERIOD` discovers new or delayed work and retries failed claims. Endpoint limits still apply across workers. This is not strict fairness: slow endpoints can block healthy work if they occupy all slots. See [worker scheduling](docs/decisions/0004-worker-scheduling.md).
 
@@ -150,9 +152,11 @@ Migration 006 adds endpoint versions, configuration audit, rotation metadata, an
 
 Migration 007 adds optional producer references, search indexes, and durable bulk-recovery audit. Existing unreferenced ingestion keys remain compatible. Batch progress and referenced history are retained without automatic cleanup. See [investigation and recovery decisions](docs/decisions/0008-investigation-recovery.md).
 
+Migration 008 backfills cumulative metrics before any history can be deleted, adds worker progress and a wrapping-key marker, and records maintenance audit. Cleanup is opt-in through `admin retain`; its default preview uses a 90-day horizon and 100-item bound. Applying cleanup removes terminal history and its ingestion/replay deduplication together, so deleted events cannot be replayed. Offline wrapping-key rotation uses `admin rotate-master-key`. Read [operations](docs/operations.md) before running either command or upgrading a populated database.
+
 ## Next steps
 
-Next is milestone 8: coordinated retention, database/key recovery, readiness, alerting, and longer-running operational evidence. Fair scheduling remains deferred. Existing [load measurements](docs/benchmarks/sustained/README.md) predate authentication and are not production capacity claims. See [ROADMAP.md](ROADMAP.md).
+Fairer endpoint claiming remains the next evidence-driven candidate, not a production rollout commitment. Existing [load measurements](docs/benchmarks/sustained/README.md) predate authentication; [milestone 8 verification](docs/verification/milestone-8/README.md) covers operational recovery and two-worker local checks. Neither establishes production capacity. See [ROADMAP.md](ROADMAP.md).
 
 ## License
 

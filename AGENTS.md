@@ -4,7 +4,7 @@
 
 Webhook Redrive is a reliable webhook delivery service. The hard parts are delivery state, retries, duplicate handling, signatures, and enough telemetry to explain every attempt.
 
-Read `README.md` and `ROADMAP.md` before changing scope. Milestones 0 through 7 are implemented. Local load evidence is in `docs/benchmarks/README.md`; it predates authentication and is not production capacity.
+Read `README.md` and `ROADMAP.md` before changing scope. Milestones 0 through 8 are implemented. Local load evidence is in `docs/benchmarks/README.md`; it predates authentication and is not production capacity. Newer operational evidence is in `docs/verification/milestone-8/README.md`.
 
 ## Product rules
 
@@ -23,6 +23,7 @@ Read `README.md` and `ROADMAP.md` before changing scope. Milestones 0 through 7 
 - The public `signature` package is the shared wire implementation. Keep v1 compatibility; metadata headers are unsigned. Receiver business deduplication must use an identifier inside the verified body and commit its receipt with the business action.
 - Read `docs/decisions/0007-endpoint-lifecycle.md` before changing endpoint lifecycle or expiration. Share the endpoint claim lock, commit versioned edits with authenticated audit, and preserve per-cycle retry/deadline snapshots. Pause does not cancel existing claims or stop expiration. Retirement must wait for old live claims; it is not emergency revocation.
 - Read `docs/decisions/0008-investigation-recovery.md` before changing search, producer references, or bulk replay. Freeze explicit event/attempt pairs; commit each replay and item result together using the shared replay helper. Recheck eligibility, preserve creator ownership, and never turn a preview into background execution. Keep references, filters, reasons, and raw failures out of telemetry.
+- Read `docs/decisions/0009-operations.md` before changing retention, cumulative accounting, wrapping keys, or health. Keep cleanup opt-in; lock and recheck before deleting an event with its keys/history. Never subtract or rebuild totals from pruned history. Keep accounting triggers deferred. Rotation requires all API/worker processes stopped; old backups still need their matching old key.
 
 ## Keep the first system small
 
@@ -30,7 +31,7 @@ Start with one HTTP service, one worker process, and one durable database. Do no
 
 The repository uses Go 1.24, `net/http`, pgx v5, and PostgreSQL 17. Keep one Go module with `cmd/api`, `cmd/worker`, and `cmd/receiver`. See `docs/decisions/0001-foundation.md` before changing these choices.
 
-`cmd/loadtest` is a local development tool, not another service. Read `docs/decisions/0003-observability.md` before changing tracing or database-derived metric accounting. History deletion would invalidate the current cumulative metrics.
+`cmd/loadtest` is a local development tool, not another service. Read `docs/decisions/0003-observability.md` and its operations successor before changing tracing or metrics. Counters survive retention; live gauges still read retained history. Keep OTLP optional and exporter failures redacted.
 
 `cmd/admin` is an offline database utility. Compose's `access-init` is a one-shot synthetic credential seed, not a deployed authentication service. Never reuse demo credentials outside the local stack.
 
@@ -63,6 +64,8 @@ Set `API_TOKEN` to the synthetic Compose credential documented in README before 
 Use `scripts/measure-load.ps1` for paced-load/database evidence. Its benchmark override and statement statistics belong only on fresh local projects. Preserve raw reports, exclude invalid timing, and check statistics reset/eviction before comparing deltas. The saturation workload assumes one ten-slot worker; it does not prove multi-worker fairness.
 
 Prioritize tests for state transitions, retry timing, concurrent claims, crash recovery, signature verification, rate limits, and replay. Use a controllable clock and deterministic jitter in tests.
+
+For operations changes, run `MEASURE_HISTORY=true go test -race -count=1 -v ./internal/store -run TestOperations` (set the environment variable separately in PowerShell) and `promtool test rules ops/alerts.test.yml`, or the documented container equivalent. Run `scripts/recovery-demo.ps1 -SourceProject <webhook-redrive-name>` only against a synthetic local Compose stack; it stops source API/workers temporarily, restores into a fresh project, and preserves volumes/dumps. Never publish database dumps. See `docs/operations.md` for commands and key-handling limits.
 
 Use synthetic endpoints and credentials. Do not connect tests or demos to production systems.
 

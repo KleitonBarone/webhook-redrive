@@ -1,4 +1,4 @@
-// admin is an offline credential-management utility. It requires database access.
+// admin manages credentials and explicit maintenance through database access.
 package main
 
 import (
@@ -27,6 +27,9 @@ func main() {
 }
 
 func run(args []string, output io.Writer) error {
+	if len(args) > 0 && (args[0] == "retain" || args[0] == "rotate-master-key") {
+		return maintenance(args, output)
+	}
 	if len(args) == 0 {
 		return errors.New("expected create, issue, or revoke")
 	}

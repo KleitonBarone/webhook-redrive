@@ -29,6 +29,7 @@ const (
 )
 
 type dataStore interface {
+	Ready(context.Context) error
 	Metrics(context.Context, time.Time) (store.MetricsSnapshot, error)
 	CreateEndpoint(context.Context, store.Endpoint, []byte) error
 	GetEndpoint(context.Context, string) (store.Endpoint, error)
@@ -63,6 +64,7 @@ func New(dataStore dataStore, box *secret.Box, serviceClock clock.Clock, logger 
 	api := &API{store: dataStore, box: box, clock: serviceClock, logger: logger, tracer: tracer, security: security}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", api.health)
+	mux.HandleFunc("GET /readyz", api.ready)
 	mux.HandleFunc("GET /metrics", api.require(auth.Metrics, api.metrics))
 	mux.HandleFunc("POST /v1/endpoints", api.require(auth.Endpoints, api.createEndpoint))
 	mux.HandleFunc("GET /v1/endpoints", api.require(auth.Inspect, api.listEndpoints))
@@ -87,6 +89,16 @@ func New(dataStore dataStore, box *secret.Box, serviceClock clock.Clock, logger 
 
 func (a *API) health(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (a *API) ready(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), time.Second)
+	defer cancel()
+	if a.store.Ready(ctx) != nil {
+		writeError(w, http.StatusServiceUnavailable, "not ready")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
 }
 
 func (a *API) createEndpoint(w http.ResponseWriter, request *http.Request) {
@@ -180,6 +192,10 @@ func (a *API) createEvent(w http.ResponseWriter, request *http.Request) {
 		State: "pending", CreatedAt: a.clock.Now(),
 	}
 	receipt, err := a.store.IngestEvent(ctx, event, payload, attemptID, auth.FromContext(ctx).ID, key)
+	if errors.Is(err, store.ErrIdempotencyExpired) {
+		writeError(w, http.StatusConflict, "idempotency receipt expired; reconcile before submitting again")
+		return
+	}
 	if errors.Is(err, store.ErrIdempotencyConflict) {
 		writeError(w, http.StatusConflict, "idempotency key conflicts with accepted event")
 		return
@@ -235,7 +251,7 @@ func (a *API) internalError(w http.ResponseWriter, request *http.Request, operat
 
 func (a *API) logRequests(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
-		if request.URL.Path == "/healthz" || request.URL.Path == "/metrics" {
+		if request.URL.Path == "/healthz" || request.URL.Path == "/readyz" || request.URL.Path == "/metrics" {
 			next.ServeHTTP(w, request)
 			return
 		}

@@ -51,6 +51,13 @@ func TestMetricsTrackCommittedStateAndRecovery(t *testing.T) {
 	if m.States["succeeded"] != 1 || m.Completed["succeeded"] != 1 || m.Claims != 3 || m.Latency["attempt"].Sum != 1.5 {
 		t.Fatalf("success: %+v", m)
 	}
+	if m.WorkersRecent != 1 || m.WorkerPollAgeSeconds != 1 || m.WorkerCompletionAgeSeconds != 0.5 {
+		t.Fatalf("worker progress: %+v", m)
+	}
+	idle, err := s.Metrics(ctx, due.Add(2*time.Minute))
+	if err != nil || idle.WorkersRecent != 0 || idle.WorkerPollAgeSeconds != 120 {
+		t.Fatalf("stalled worker: %+v %v", idle, err)
+	}
 	// Reopening the pool models a process restart; counters are database-derived.
 	history, err := s.ListAttempts(ctx, eventID)
 	if err != nil || len(history) != 2 {

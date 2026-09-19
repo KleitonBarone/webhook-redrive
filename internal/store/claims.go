@@ -110,6 +110,10 @@ func (s *Store) ClaimAvailable(ctx context.Context, workerID string, now time.Ti
 		}
 		claimed = append(claimed, batch...)
 	}
+	if _, err := tx.Exec(ctx, `INSERT INTO worker_progress(worker_id,polled_at,claimed_at) VALUES($1,$2,CASE WHEN $3>0 THEN $2::timestamptz END)
+	ON CONFLICT(worker_id) DO UPDATE SET polled_at=excluded.polled_at,claimed_at=coalesce(excluded.claimed_at,worker_progress.claimed_at)`, workerID, now, len(claimed)); err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit claims: %w", err)
 	}

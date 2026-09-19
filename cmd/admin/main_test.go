@@ -61,10 +61,31 @@ func TestCredentialAdministration(t *testing.T) {
 
 func TestInvalidCommandOptionsDoNotConnect(t *testing.T) {
 	t.Setenv("DATABASE_URL", "")
-	for _, args := range [][]string{nil, {"unknown"}, {"create", "--permissions", "root"}, {"issue", "--principal", "bad"}, {"revoke", "--credential", "bad"}, {"create", "--name", "test", "--permissions", "inspect", "extra"}} {
+	for _, args := range [][]string{nil, {"unknown"}, {"create", "--permissions", "root"}, {"issue", "--principal", "bad"}, {"revoke", "--credential", "bad"}, {"create", "--name", "test", "--permissions", "inspect", "extra"}, {"retain", "--days", "0"}, {"retain", "--limit", "101"}, {"rotate-master-key", "--apply"}} {
 		var output bytes.Buffer
 		if err := run(args, &output); err == nil || output.Len() != 0 {
 			t.Fatal("invalid command accepted")
 		}
+	}
+}
+
+func TestRetentionAdministrationDefaultsToPreview(t *testing.T) {
+	databaseURL := testdb.URL(t)
+	t.Setenv("DATABASE_URL", databaseURL)
+	s, err := store.Open(context.Background(), databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if err = s.Migrate(context.Background(), time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	if err = run([]string{"retain"}, &output); err != nil {
+		t.Fatal(err)
+	}
+	var result store.RetentionResult
+	if err = json.Unmarshal(output.Bytes(), &result); err != nil || result.Applied {
+		t.Fatal("retention did not default to preview")
 	}
 }

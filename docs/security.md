@@ -1,6 +1,6 @@
 # Access and destination setup
 
-Milestone 4 adds access controls for a single trusted team. It does not add tenant isolation, SSO, retention, or a production deployment. Use TLS and network restrictions around any non-local installation. The repository's Compose stack is a local demo with public credentials.
+Access controls target a single trusted team, without tenant isolation or SSO. This is not a production deployment. Use TLS and network restrictions around any non-local installation. The repository's Compose stack is a local demo with public credentials. [Operations](operations.md) covers retention, backup custody, and offline wrapping-key rotation.
 
 ## Issue and revoke credentials
 
@@ -30,7 +30,7 @@ In Compose, use `docker compose exec -T api admin` instead of `go run ./cmd/admi
 | `replay` | Replay eligible failed events; preview bulk recovery and confirm/resume batches owned by the principal |
 | `metrics` | Read `/metrics` |
 
-Combine permissions with commas, for example `--permissions inspect,replay`. `--kind operator` labels an operator identity but grants no permissions by itself. All permissions apply to the whole installation. Use separate credentials per caller; a bearer token identifies its assigned principal, not the human holding it. Only `/healthz` is unauthenticated.
+Combine permissions with commas, for example `--permissions inspect,replay`. `--kind operator` labels an operator identity but grants no permissions by itself. All permissions apply to the whole installation. Use separate credentials per caller; a bearer token identifies its assigned principal, not the human holding it. Only the minimal `/healthz` and `/readyz` checks are unauthenticated.
 
 Invalid credentials return 401, insufficient permissions 403, and an unavailable authentication database 503. Revocation affects subsequent authentication checks across API processes; requests already authorized can finish. Revoking a producer credential does not cancel previously accepted events.
 

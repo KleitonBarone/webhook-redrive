@@ -134,18 +134,20 @@ A dashboard is deferred. Revisit a small operator interface if support staff nee
 
 ## 8. Long-running operations and recovery evidence
 
-The system needs a bounded data lifecycle and a tested way to recover its database and encryption keys.
+Implemented with opt-in coordinated cleanup, retention-safe cumulative accounting, offline wrapping-key rotation, database readiness, committed worker progress, optional OTLP export, and tested operational alerts. See [operations](docs/operations.md), [ADR 0009](docs/decisions/0009-operations.md), and [local evidence](docs/verification/milestone-8/README.md).
 
-- [ ] Define payload and attempt retention, audit retention, replay availability, and idempotency-key expiry together
-- [ ] Replace history-derived cumulative metric accounting before deleting history; current counters and histograms depend on retained attempts
-- [ ] Add bounded, restart-safe retention cleanup that preserves active delivery intent and documents what can no longer be replayed
-- [ ] Document and test PostgreSQL backup/restore, master-key recovery, and master-key rotation
-- [ ] Separate process liveness from database readiness and expose enough worker progress information to detect stalled delivery
-- [ ] Ship alert rules and runbooks for oldest-ready age, exhausted deliveries, stalled workers, database failures, and storage growth
-- [ ] Support trace export to an existing telemetry backend without adding a required monitoring service
-- [ ] Document upgrades and run longer-load, larger-history, and multi-worker checks on isolated local infrastructure
+- [x] Define payload and attempt retention, audit retention, replay availability, and idempotency-key expiry together
+- [x] Replace history-derived cumulative metric accounting before deleting history
+- [x] Add bounded, restart-safe retention cleanup that preserves active delivery intent and documents what can no longer be replayed
+- [x] Document and test PostgreSQL backup/restore, master-key recovery, and master-key rotation
+- [x] Separate process liveness from database readiness and expose enough worker progress information to detect stalled delivery
+- [x] Ship alert rules and runbooks for oldest-ready age, exhausted deliveries, stalled workers, database failures, and storage growth
+- [x] Support trace export to an existing telemetry backend without adding a required monitoring service
+- [x] Document upgrades and run longer-load, larger-history, and multi-worker checks on isolated local infrastructure
 
-Acceptance evidence: restore synthetic data into a fresh environment, decrypt endpoint secrets, resume pending work, and verify preserved history. Exercise alerts and retention boundaries. Publish workload, revision, environment, and measurement limits without claiming production capacity.
+Acceptance evidence: the Go 1.24 race-enabled PostgreSQL suite, static analysis, formatting, and seven synthetic alert-rule checks passed. A real dump/restore into a fresh local project preserved history and ingestion receipts, validated/decrypted secrets, rotated the wrapping key, and resumed signed unchanged pending delivery. Tests cover cleanup boundaries, rollback, batch pins, replay races, active intent, key expiry, and preserved cumulative accounting. A 10,000-event SQL history check removed 100 groups without changing totals. Two-worker success/mixed/fairness runs verified 1,880 events and 1,894 deliveries; the paced run lasted three minutes. Host-clock drift invalidated all three load timing reports, so they support correctness only.
+
+Cleanup is administrator-triggered, bounded by event groups and a command deadline, not a strict per-event row/byte cap. Key rotation is offline. Gauges still query retained state, and cumulative updates share one final transaction lock. No automatic backup scheduling, PITR, HA, production RPO/RTO, or monitoring service was added. The next candidate is endpoint-fair claiming below, subject to comparative evidence.
 
 ## Later, if justified
 

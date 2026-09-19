@@ -1,0 +1,10 @@
+{
+  "source_project": "webhook-redrive-m8-20260919",
+  "restore_project": "webhook-redrive-m8-20260919-restore-34385784",
+  "history_preserved": true,
+  "keyed_receipt_preserved": true,
+  "wrapping_key_rotated": true,
+  "pending_delivered": true,
+  "signature_valid": true,
+  "dump": "artifacts/recovery/webhook-redrive-m8-20260919-restore-34385784/backup.dump"
+}

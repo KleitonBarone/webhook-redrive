@@ -1,0 +1,7 @@
+{
+  "project": "webhook-redrive-m8-20260919",
+  "database_stopped": true,
+  "liveness_status": 200,
+  "readiness_status": 503,
+  "readiness_body": "{\"error\":\"not ready\"}"
+}

@@ -93,6 +93,9 @@ func run(logger *slog.Logger) error {
 	if err := dataStore.Migrate(ctx, serviceClock.Now()); err != nil {
 		return err
 	}
+	if err := dataStore.CheckMasterKey(ctx, box); err != nil {
+		return err
+	}
 	worker, err := delivery.NewWorker(dataStore, box, serviceClock, logger, delivery.Config{
 		Destinations: policy,
 		Tracer:       provider.Tracer("webhook-redrive"),
