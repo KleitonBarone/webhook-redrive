@@ -1,0 +1,104 @@
+{
+  "baseline_revision": "be8baaddc32c51c724b19f1d568cf38ee7c9d517",
+  "balanced_revision": "same commit as this verification record",
+  "build": "Go 1.24.13 Linux/amd64, CGO_ENABLED=0 go build -buildvcs=false -trimpath",
+  "binaries": [
+    {
+      "variant": "baseline",
+      "binary": "api",
+      "sha256": "feaeac78632aa647876a46ebb5ecccd13d751db8bd937eae9ba3270a76e1bb40"
+    },
+    {
+      "variant": "baseline",
+      "binary": "worker",
+      "sha256": "bd28860ab8bfbf8d70f4f59e5458ce31bf6c53a4ada3fdbdabdcffefa43b69ca"
+    },
+    {
+      "variant": "baseline",
+      "binary": "receiver",
+      "sha256": "7b8e4f46fdfcaeb9b8bd92541bc0dadb682c98a00a5aeb8a2981610669dc6f73"
+    },
+    {
+      "variant": "baseline",
+      "binary": "loadtest",
+      "sha256": "2c1734770f9f9ca386155f9d8c5ae365501c97374de8f16e15668326b2863531"
+    },
+    {
+      "variant": "baseline",
+      "binary": "admin",
+      "sha256": "fcf8826c774d4ad919dffd9ff2c04831db26a147152a15b03194983571b24dac"
+    },
+    {
+      "variant": "candidate",
+      "binary": "api",
+      "sha256": "724c4a4be7756c98c80034a91a47f1dc033334d1987831d5cc7e89278556f2c8"
+    },
+    {
+      "variant": "candidate",
+      "binary": "worker",
+      "sha256": "5946e4ae061e9fb7bd0cee3712280055a868c9c02cb35fc8fc05d6e8202ce070"
+    },
+    {
+      "variant": "candidate",
+      "binary": "receiver",
+      "sha256": "7b8e4f46fdfcaeb9b8bd92541bc0dadb682c98a00a5aeb8a2981610669dc6f73"
+    },
+    {
+      "variant": "candidate",
+      "binary": "loadtest",
+      "sha256": "4e0031b9afc1687dd42a05e7f8f7bc2e9668d606bf79344ab47025fb489f62dd"
+    },
+    {
+      "variant": "candidate",
+      "binary": "admin",
+      "sha256": "20bdf401666e7e2d8fcfd7a62a78baaa14bf21c1343235eb035b7cf4a1388854"
+    },
+    {
+      "variant": "occupancy",
+      "binary": "api",
+      "sha256": "e2440fd1912dbdf84ea52ab54799d1719ad078a22511705e6003745c1a2c43b9"
+    },
+    {
+      "variant": "occupancy",
+      "binary": "worker",
+      "sha256": "e37bc6eb5e07f2b9a481aae837335150dd83bb6fd84f14167cb56c6d42497893"
+    },
+    {
+      "variant": "occupancy",
+      "binary": "receiver",
+      "sha256": "7b8e4f46fdfcaeb9b8bd92541bc0dadb682c98a00a5aeb8a2981610669dc6f73"
+    },
+    {
+      "variant": "occupancy",
+      "binary": "loadtest",
+      "sha256": "9cf45c546ad26496f35433c60962ed00c6757f6e3f6292dd347c8fe43a7f060f"
+    },
+    {
+      "variant": "occupancy",
+      "binary": "admin",
+      "sha256": "e5684dada8e7689082a85492911c0f2e304aeb22d92dbf6438453f304fa77f8f"
+    }
+  ],
+  "balanced_source_files": [
+    {
+      "file": "internal/store/claims.go",
+      "sha256": "32c567001deeee46681e65f612b860cff27ebb842594ef20bfd0a2518e03f27a"
+    },
+    {
+      "file": "internal/store/fairness.go",
+      "sha256": "416cff6b5513fddcf868890165f68ef0e60607851a78b35a9eb4a348cc828074"
+    },
+    {
+      "file": "migrations/009_endpoint_fairness.sql",
+      "sha256": "93df67532807026dc4536a5f6bfb5dc4ea2491e47ea646d3318fe86e690ea36b"
+    },
+    {
+      "file": "cmd/loadtest/main.go",
+      "sha256": "4265cd0c480fe7df34d1d8efa0866507179f35fc37b2b534bbb74bd8839d2e68"
+    },
+    {
+      "file": "cmd/loadtest/measurement.go",
+      "sha256": "edf8076b653394d3560ff184654af8895aaddb9ae1ff647b0bf83a2e64b4c463"
+    }
+  ]
+}

@@ -1,0 +1,458 @@
+[
+  {
+    "policy": "baseline",
+    "project": "webhook-measure-ec7a36e06c2f",
+    "events": 130,
+    "deliveries": 160,
+    "slow_endpoints": 1,
+    "healthy_p95_ms": 5734.945,
+    "timeout_p95_ms": 12394.379,
+    "actual_ingestion_per_second": 12.705012147727802,
+    "completed_events_per_second": 9.827800563283489,
+    "sql_ms_per_event": 18.941320646153844,
+    "max_clock_drift_ms": 3E-05,
+    "deadlocks": 0,
+    "temporary_bytes": 0,
+    "statement_deltas": {
+      "transaction": {
+        "calls": 957,
+        "execution_ms": 0.6608960000000005,
+        "rows": 0
+      },
+      "claim_rate": {
+        "calls": 151,
+        "execution_ms": 17.893172999999997,
+        "rows": 151
+      },
+      "metrics": {
+        "calls": 17,
+        "execution_ms": 1.5044170000000001,
+        "rows": 45
+      },
+      "other": {
+        "calls": 4023,
+        "execution_ms": 2350.128726,
+        "rows": 3858
+      },
+      "claim_capacity": {
+        "calls": 151,
+        "execution_ms": 7.226605999999998,
+        "rows": 151
+      },
+      "claim_attempts": {
+        "calls": 151,
+        "execution_ms": 53.064933,
+        "rows": 160
+      },
+      "observer": {
+        "calls": 1,
+        "execution_ms": 2.6058530000000033,
+        "rows": 1
+      },
+      "claim_endpoints": {
+        "calls": 178,
+        "execution_ms": 31.892933000000003,
+        "rows": 151
+      }
+    }
+  },
+  {
+    "policy": "baseline",
+    "project": "webhook-measure-6f12692ccec4",
+    "events": 130,
+    "deliveries": 160,
+    "slow_endpoints": 5,
+    "healthy_p95_ms": 5748.549,
+    "timeout_p95_ms": 12969.628999999999,
+    "actual_ingestion_per_second": 12.78590841507503,
+    "completed_events_per_second": 9.939937260831796,
+    "sql_ms_per_event": 16.89676182307692,
+    "max_clock_drift_ms": 1.9E-05,
+    "deadlocks": 0,
+    "temporary_bytes": 0,
+    "statement_deltas": {
+      "transaction": {
+        "calls": 962,
+        "execution_ms": 0.5274130000000002,
+        "rows": 0
+      },
+      "claim_rate": {
+        "calls": 155,
+        "execution_ms": 17.098557,
+        "rows": 155
+      },
+      "metrics": {
+        "calls": 18,
+        "execution_ms": 1.7861829999999999,
+        "rows": 46
+      },
+      "other": {
+        "calls": 4170,
+        "execution_ms": 2103.12882,
+        "rows": 4006
+      },
+      "claim_capacity": {
+        "calls": 155,
+        "execution_ms": 6.590982999999998,
+        "rows": 155
+      },
+      "claim_attempts": {
+        "calls": 155,
+        "execution_ms": 39.211952999999994,
+        "rows": 160
+      },
+      "observer": {
+        "calls": 1,
+        "execution_ms": 2.3070009999999996,
+        "rows": 1
+      },
+      "claim_endpoints": {
+        "calls": 176,
+        "execution_ms": 28.235128000000007,
+        "rows": 155
+      }
+    }
+  },
+  {
+    "policy": "baseline",
+    "project": "webhook-measure-2a43c4aeb65c",
+    "events": 3000,
+    "deliveries": 3000,
+    "slow_endpoints": null,
+    "healthy_p95_ms": 13223.097,
+    "timeout_p95_ms": null,
+    "actual_ingestion_per_second": 138.08043705220672,
+    "completed_events_per_second": 85.26384459690676,
+    "sql_ms_per_event": 10.669556168666652,
+    "max_clock_drift_ms": 1.9E-05,
+    "deadlocks": 0,
+    "temporary_bytes": 0,
+    "statement_deltas": {
+      "transaction": {
+        "calls": 18068,
+        "execution_ms": 7.113943000000014,
+        "rows": 0
+      },
+      "claim_rate": {
+        "calls": 2991,
+        "execution_ms": 306.89352800000006,
+        "rows": 2991
+      },
+      "metrics": {
+        "calls": 38,
+        "execution_ms": 45.73745900000001,
+        "rows": 93
+      },
+      "other": {
+        "calls": 67035,
+        "execution_ms": 29167.02535399995,
+        "rows": 63983
+      },
+      "claim_capacity": {
+        "calls": 2991,
+        "execution_ms": 171.74244300000018,
+        "rows": 2991
+      },
+      "claim_attempts": {
+        "calls": 2991,
+        "execution_ms": 761.7901430000016,
+        "rows": 3000
+      },
+      "observer": {
+        "calls": 1,
+        "execution_ms": 1.5741099999999975,
+        "rows": 1
+      },
+      "claim_endpoints": {
+        "calls": 3014,
+        "execution_ms": 1548.365636000003,
+        "rows": 2991
+      }
+    }
+  },
+  {
+    "policy": "rejected-equal-turns",
+    "project": "webhook-measure-694e8796a658",
+    "events": 130,
+    "deliveries": 160,
+    "slow_endpoints": 1,
+    "healthy_p95_ms": 6422.570000000001,
+    "timeout_p95_ms": 12504.877,
+    "actual_ingestion_per_second": 12.679725293884157,
+    "completed_events_per_second": 10.2153527782234,
+    "sql_ms_per_event": 14.312955330769228,
+    "max_clock_drift_ms": 1E-05,
+    "deadlocks": 0,
+    "temporary_bytes": 0,
+    "statement_deltas": {
+      "transaction": {
+        "calls": 951,
+        "execution_ms": 0.4283710000000004,
+        "rows": 0
+      },
+      "claim_rate": {
+        "calls": 152,
+        "execution_ms": 15.255421000000007,
+        "rows": 152
+      },
+      "metrics": {
+        "calls": 23,
+        "execution_ms": 1.4236419999999999,
+        "rows": 60
+      },
+      "other": {
+        "calls": 4603,
+        "execution_ms": 1787.3561799999998,
+        "rows": 4438
+      },
+      "claim_capacity": {
+        "calls": 152,
+        "execution_ms": 7.968420999999997,
+        "rows": 152
+      },
+      "claim_attempts": {
+        "calls": 152,
+        "execution_ms": 29.866842000000005,
+        "rows": 160
+      },
+      "observer": {
+        "calls": 1,
+        "execution_ms": 2.162762999999998,
+        "rows": 1
+      },
+      "claim_endpoints": {
+        "calls": 172,
+        "execution_ms": 18.385316000000003,
+        "rows": 152
+      }
+    }
+  },
+  {
+    "policy": "rejected-equal-turns",
+    "project": "webhook-measure-98b383a21aa6",
+    "events": 130,
+    "deliveries": 160,
+    "slow_endpoints": 5,
+    "healthy_p95_ms": 10723.753,
+    "timeout_p95_ms": 12377.336,
+    "actual_ingestion_per_second": 12.823748347070998,
+    "completed_events_per_second": 9.837389338283186,
+    "sql_ms_per_event": 17.179667907692306,
+    "max_clock_drift_ms": 1E-05,
+    "deadlocks": 0,
+    "temporary_bytes": 0,
+    "statement_deltas": {
+      "transaction": {
+        "calls": 950,
+        "execution_ms": 0.47963600000000023,
+        "rows": 0
+      },
+      "claim_rate": {
+        "calls": 155,
+        "execution_ms": 17.841391,
+        "rows": 155
+      },
+      "metrics": {
+        "calls": 18,
+        "execution_ms": 1.423672,
+        "rows": 50
+      },
+      "other": {
+        "calls": 5690,
+        "execution_ms": 2146.326671,
+        "rows": 5532
+      },
+      "claim_capacity": {
+        "calls": 155,
+        "execution_ms": 7.865671,
+        "rows": 155
+      },
+      "claim_attempts": {
+        "calls": 155,
+        "execution_ms": 37.37318300000001,
+        "rows": 160
+      },
+      "observer": {
+        "calls": 1,
+        "execution_ms": 3.6921849999999985,
+        "rows": 1
+      },
+      "claim_endpoints": {
+        "calls": 170,
+        "execution_ms": 22.046604000000006,
+        "rows": 155
+      }
+    }
+  },
+  {
+    "policy": "balanced",
+    "project": "webhook-measure-93e5e27261ea",
+    "events": 130,
+    "deliveries": 160,
+    "slow_endpoints": 1,
+    "healthy_p95_ms": 1782.3029999999999,
+    "timeout_p95_ms": 12811.492,
+    "actual_ingestion_per_second": 12.632050372624382,
+    "completed_events_per_second": 10.020757051656378,
+    "sql_ms_per_event": 15.99819944615384,
+    "max_clock_drift_ms": 1E-05,
+    "deadlocks": 0,
+    "temporary_bytes": 0,
+    "statement_deltas": {
+      "transaction": {
+        "calls": 950,
+        "execution_ms": 0.40909099999999965,
+        "rows": 0
+      },
+      "claim_rate": {
+        "calls": 152,
+        "execution_ms": 15.861954000000008,
+        "rows": 152
+      },
+      "metrics": {
+        "calls": 24,
+        "execution_ms": 1.6897330000000002,
+        "rows": 60
+      },
+      "other": {
+        "calls": 3386,
+        "execution_ms": 1994.000121999999,
+        "rows": 3221
+      },
+      "claim_capacity": {
+        "calls": 152,
+        "execution_ms": 18.711651000000003,
+        "rows": 152
+      },
+      "claim_attempts": {
+        "calls": 152,
+        "execution_ms": 30.397396999999994,
+        "rows": 160
+      },
+      "observer": {
+        "calls": 1,
+        "execution_ms": 1.9053859999999965,
+        "rows": 1
+      },
+      "claim_endpoints": {
+        "calls": 171,
+        "execution_ms": 18.695979999999995,
+        "rows": 152
+      }
+    }
+  },
+  {
+    "policy": "balanced",
+    "project": "webhook-measure-b1b95f35553a",
+    "events": 130,
+    "deliveries": 160,
+    "slow_endpoints": 5,
+    "healthy_p95_ms": 1735.1499999999999,
+    "timeout_p95_ms": 12478.821999999998,
+    "actual_ingestion_per_second": 12.831870186063874,
+    "completed_events_per_second": 10.285903527892392,
+    "sql_ms_per_event": 15.315433876923079,
+    "max_clock_drift_ms": 1E-05,
+    "deadlocks": 0,
+    "temporary_bytes": 0,
+    "statement_deltas": {
+      "transaction": {
+        "calls": 950,
+        "execution_ms": 0.4960410000000003,
+        "rows": 0
+      },
+      "claim_rate": {
+        "calls": 155,
+        "execution_ms": 14.517456000000005,
+        "rows": 155
+      },
+      "metrics": {
+        "calls": 16,
+        "execution_ms": 1.2430869999999998,
+        "rows": 44
+      },
+      "other": {
+        "calls": 3258,
+        "execution_ms": 1916.664246,
+        "rows": 3101
+      },
+      "claim_capacity": {
+        "calls": 155,
+        "execution_ms": 7.630882999999998,
+        "rows": 155
+      },
+      "claim_attempts": {
+        "calls": 155,
+        "execution_ms": 29.348272000000016,
+        "rows": 160
+      },
+      "observer": {
+        "calls": 1,
+        "execution_ms": 1.6364330000000002,
+        "rows": 1
+      },
+      "claim_endpoints": {
+        "calls": 171,
+        "execution_ms": 21.106419000000002,
+        "rows": 155
+      }
+    }
+  },
+  {
+    "policy": "balanced",
+    "project": "webhook-measure-2943da9c8ce6",
+    "events": 3000,
+    "deliveries": 3000,
+    "slow_endpoints": null,
+    "healthy_p95_ms": 11622.295,
+    "timeout_p95_ms": null,
+    "actual_ingestion_per_second": 138.32867472074486,
+    "completed_events_per_second": 89.32220762064783,
+    "sql_ms_per_event": 9.958023447999993,
+    "max_clock_drift_ms": 2.8E-05,
+    "deadlocks": 0,
+    "temporary_bytes": 0,
+    "statement_deltas": {
+      "transaction": {
+        "calls": 18060,
+        "execution_ms": 6.551877000000011,
+        "rows": 0
+      },
+      "claim_rate": {
+        "calls": 2991,
+        "execution_ms": 317.67187299999995,
+        "rows": 2991
+      },
+      "metrics": {
+        "calls": 36,
+        "execution_ms": 45.59371,
+        "rows": 90
+      },
+      "other": {
+        "calls": 65751,
+        "execution_ms": 27016.799403999976,
+        "rows": 62704
+      },
+      "claim_capacity": {
+        "calls": 2991,
+        "execution_ms": 207.82150500000003,
+        "rows": 2991
+      },
+      "claim_attempts": {
+        "calls": 2991,
+        "execution_ms": 676.2719460000006,
+        "rows": 3000
+      },
+      "observer": {
+        "calls": 1,
+        "execution_ms": 2.2036399999999965,
+        "rows": 1
+      },
+      "claim_endpoints": {
+        "calls": 3011,
+        "execution_ms": 1603.360029,
+        "rows": 2991
+      }
+    }
+  }
+]

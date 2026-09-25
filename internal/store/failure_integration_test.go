@@ -292,6 +292,10 @@ func TestMigrationPreservesMilestoneOneData(t *testing.T) {
 	if history[0].ExpiresAt != nil || history[0].EndpointVersion != nil {
 		t.Fatal("migration invented historical deadline or configuration")
 	}
+	var serviceOrder int64
+	if err := s.pool.QueryRow(context.Background(), `SELECT last_service_seq FROM webhook_endpoints WHERE id=$1`, endpoint).Scan(&serviceOrder); err != nil || serviceOrder != 0 {
+		t.Fatalf("migration invented service order: %d %v", serviceOrder, err)
+	}
 	input := ReplayRequest{AttemptID: attempt, RequestID: mustID(t), Actor: "test", Reason: "upgrade"}
 	if _, err := s.Replay(context.Background(), event, input, testNow); err != nil {
 		t.Fatal(err)

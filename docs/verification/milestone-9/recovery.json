@@ -1,0 +1,12 @@
+{
+  "source_project": "webhook-redrive-m9-demo",
+  "restore_project": "webhook-redrive-m9-demo-restore-a10e058c",
+  "history_preserved": true,
+  "keyed_receipt_preserved": true,
+  "wrapping_key_rotated": true,
+  "pending_delivered": true,
+  "signature_valid": true,
+  "service_order_preserved": true,
+  "service_sequence_advanced": true,
+  "dump": "artifacts/recovery/webhook-redrive-m9-demo-restore-a10e058c/backup.dump"
+}

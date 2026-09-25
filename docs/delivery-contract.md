@@ -61,6 +61,18 @@ A rate window lasts one second from the first claim in that window. Up to `rate_
 
 Workers must use synchronized clocks. No FIFO or cross-event ordering guarantee exists.
 
+Workers give free slots to eligible endpoints with fewer live claims, rotating
+equal-occupancy endpoints by recent service. Service order commits with leases and rate permits
+and survives restarts. A database sequence supplies that order independently of
+wall time; eligibility and leases still require synchronized clocks. Locked,
+paused, and limit-exhausted endpoints do not block other eligible work.
+
+Balancing live claims does not provide tenant isolation or equal processing
+time. Already-running requests keep their slots. Concurrent workers may skip
+locked endpoints, so there is no strict global round-robin or maximum latency
+guarantee. A lone eligible endpoint can fill the available capacity up to its
+limits. See [the scheduling decision](decisions/0010-endpoint-fair-claiming.md).
+
 ## Endpoint changes and pause
 
 Version-checked updates commit with authenticated configuration audit under the endpoint claim lock. Destination and signing changes apply to the next claim, including queued retries, recovery, and replay. Existing claims retain their captured configuration. Attempts expose the endpoint and signing versions of the last claim; historical completed attempts are not rewritten. Delivery settings do not retroactively change cycle snapshots.

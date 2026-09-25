@@ -1,0 +1,290 @@
+{
+  "project": "webhook-measure-6f12692ccec4",
+  "revision": "be8baaddc32c51c724b19f1d568cf38ee7c9d517-dirty",
+  "before": {
+    "captured_at": "2026-09-19T22:21:48.733009-03:00",
+    "server_version": "17.11",
+    "statistics_reset": "2026-09-19T22:21:39.38083-03:00",
+    "statistics_deallocations": 0,
+    "database_bytes": 8681139,
+    "events": 0,
+    "attempts": 0,
+    "statements": {
+      "claim_endpoints": {
+        "rows": 0,
+        "calls": 15,
+        "read_ms": 0,
+        "write_ms": 0,
+        "wal_bytes": 0,
+        "buffer_hits": 21,
+        "buffer_reads": 0,
+        "execution_ms": 0.700942,
+        "temp_blocks_written": 0
+      },
+      "other": {
+        "rows": 65,
+        "calls": 133,
+        "read_ms": 2.45449,
+        "write_ms": 4.978340999999999,
+        "wal_bytes": 752117,
+        "buffer_hits": 16622,
+        "buffer_reads": 154,
+        "execution_ms": 167.67372700000007,
+        "temp_blocks_written": 0
+      },
+      "observer": {
+        "rows": 0,
+        "calls": 1,
+        "read_ms": 0.552526,
+        "write_ms": 0.307103,
+        "wal_bytes": 271109,
+        "buffer_hits": 3548,
+        "buffer_reads": 43,
+        "execution_ms": 30.856105,
+        "temp_blocks_written": 0
+      },
+      "transaction": {
+        "rows": 0,
+        "calls": 68,
+        "read_ms": 0,
+        "write_ms": 0,
+        "wal_bytes": 0,
+        "buffer_hits": 0,
+        "buffer_reads": 0,
+        "execution_ms": 0.151493,
+        "temp_blocks_written": 0
+      }
+    },
+    "database": {
+      "commits": 39,
+      "rollbacks": 8,
+      "deadlocks": 0,
+      "temp_bytes": 0,
+      "read_ms": 4.978,
+      "write_ms": 5.249,
+      "statistics_reset": null
+    }
+  },
+  "after": {
+    "captured_at": "2026-09-19T22:22:04.858879-03:00",
+    "server_version": "17.11",
+    "statistics_reset": "2026-09-19T22:21:39.38083-03:00",
+    "statistics_deallocations": 0,
+    "database_bytes": 9082547,
+    "events": 130,
+    "attempts": 160,
+    "statements": {
+      "claim_capacity": {
+        "rows": 155,
+        "calls": 155,
+        "read_ms": 0,
+        "write_ms": 0,
+        "wal_bytes": 114,
+        "buffer_hits": 593,
+        "buffer_reads": 0,
+        "execution_ms": 6.590982999999998,
+        "temp_blocks_written": 0
+      },
+      "metrics": {
+        "rows": 46,
+        "calls": 18,
+        "read_ms": 0,
+        "write_ms": 0,
+        "wal_bytes": 72,
+        "buffer_hits": 122,
+        "buffer_reads": 0,
+        "execution_ms": 1.7861829999999999,
+        "temp_blocks_written": 0
+      },
+      "claim_endpoints": {
+        "rows": 155,
+        "calls": 191,
+        "read_ms": 0,
+        "write_ms": 0,
+        "wal_bytes": 14598,
+        "buffer_hits": 6701,
+        "buffer_reads": 0,
+        "execution_ms": 28.936070000000008,
+        "temp_blocks_written": 0
+      },
+      "claim_rate": {
+        "rows": 155,
+        "calls": 155,
+        "read_ms": 0,
+        "write_ms": 0,
+        "wal_bytes": 13051,
+        "buffer_hits": 845,
+        "buffer_reads": 0,
+        "execution_ms": 17.098557,
+        "temp_blocks_written": 0
+      },
+      "other": {
+        "rows": 4071,
+        "calls": 4303,
+        "read_ms": 2.5188029999999997,
+        "write_ms": 6.641062,
+        "wal_bytes": 1224727,
+        "buffer_hits": 42644,
+        "buffer_reads": 155,
+        "execution_ms": 2270.802547,
+        "temp_blocks_written": 0
+      },
+      "observer": {
+        "rows": 1,
+        "calls": 2,
+        "read_ms": 0.552526,
+        "write_ms": 0.307103,
+        "wal_bytes": 271109,
+        "buffer_hits": 3552,
+        "buffer_reads": 43,
+        "execution_ms": 33.163106,
+        "temp_blocks_written": 0
+      },
+      "claim_attempts": {
+        "rows": 160,
+        "calls": 155,
+        "read_ms": 0,
+        "write_ms": 0.160972,
+        "wal_bytes": 149083,
+        "buffer_hits": 4484,
+        "buffer_reads": 0,
+        "execution_ms": 39.211952999999994,
+        "temp_blocks_written": 0
+      },
+      "transaction": {
+        "rows": 0,
+        "calls": 1030,
+        "read_ms": 0,
+        "write_ms": 0,
+        "wal_bytes": 0,
+        "buffer_hits": 0,
+        "buffer_reads": 0,
+        "execution_ms": 0.6789060000000002,
+        "temp_blocks_written": 0
+      }
+    },
+    "database": {
+      "commits": 2776,
+      "rollbacks": 8,
+      "deadlocks": 0,
+      "temp_bytes": 0,
+      "read_ms": 5.355,
+      "write_ms": 7.052,
+      "statistics_reset": null
+    }
+  },
+  "resources": [
+    {
+      "captured_at": "2026-09-20T01:21:50.1064009+00:00",
+      "container": {
+        "BlockIO": "24.9MB / 0B",
+        "CPUPerc": "4.72%",
+        "Container": "8346ef0ad0c3f8c404647290916904153501d751bbf5cb69f5c9f14fe8135041",
+        "ID": "8346ef0ad0c3",
+        "MemPerc": "0.08%",
+        "MemUsage": "12.34MiB / 15.58GiB",
+        "Name": "webhook-measure-6f12692ccec4-api-1",
+        "NetIO": "112kB / 160kB",
+        "PIDs": "19"
+      }
+    },
+    {
+      "captured_at": "2026-09-20T01:21:50.1064009+00:00",
+      "container": {
+        "BlockIO": "63.1MB / 55.2MB",
+        "CPUPerc": "39.81%",
+        "Container": "ecbe27a4bfadbf51d3586c41af4a58922dadcf8f9e86c229f35f5090ee169036",
+        "ID": "ecbe27a4bfad",
+        "MemPerc": "0.60%",
+        "MemUsage": "95.08MiB / 15.58GiB",
+        "Name": "webhook-measure-6f12692ccec4-postgres-1",
+        "NetIO": "158kB / 98.1kB",
+        "PIDs": "17"
+      }
+    },
+    {
+      "captured_at": "2026-09-20T01:21:50.1064009+00:00",
+      "container": {
+        "BlockIO": "16.9MB / 0B",
+        "CPUPerc": "0.00%",
+        "Container": "e597e6f925451e4be562243b666580d9fd74ff7302d72a12bf28a46bb65e47c9",
+        "ID": "e597e6f92545",
+        "MemPerc": "0.02%",
+        "MemUsage": "3.852MiB / 15.58GiB",
+        "Name": "webhook-measure-6f12692ccec4-receiver-1",
+        "NetIO": "13.4kB / 1.57kB",
+        "PIDs": "10"
+      }
+    },
+    {
+      "captured_at": "2026-09-20T01:21:50.1064009+00:00",
+      "container": {
+        "BlockIO": "22MB / 0B",
+        "CPUPerc": "0.10%",
+        "Container": "16d17c746f4051f653a2b5a89bde94c98732044c9d26d21c7951a534ec33f6ff",
+        "ID": "16d17c746f40",
+        "MemPerc": "0.04%",
+        "MemUsage": "6.531MiB / 15.58GiB",
+        "Name": "webhook-measure-6f12692ccec4-worker-1",
+        "NetIO": "35kB / 47.1kB",
+        "PIDs": "17"
+      }
+    },
+    {
+      "captured_at": "2026-09-20T01:21:57.3129685+00:00",
+      "container": {
+        "BlockIO": "24.9MB / 0B",
+        "CPUPerc": "4.81%",
+        "Container": "8346ef0ad0c3f8c404647290916904153501d751bbf5cb69f5c9f14fe8135041",
+        "ID": "8346ef0ad0c3",
+        "MemPerc": "0.09%",
+        "MemUsage": "14.06MiB / 15.58GiB",
+        "Name": "webhook-measure-6f12692ccec4-api-1",
+        "NetIO": "224kB / 304kB",
+        "PIDs": "19"
+      }
+    },
+    {
+      "captured_at": "2026-09-20T01:21:57.3129685+00:00",
+      "container": {
+        "BlockIO": "63.1MB / 57.4MB",
+        "CPUPerc": "11.79%",
+        "Container": "ecbe27a4bfadbf51d3586c41af4a58922dadcf8f9e86c229f35f5090ee169036",
+        "ID": "ecbe27a4bfad",
+        "MemPerc": "0.76%",
+        "MemUsage": "122MiB / 15.58GiB",
+        "Name": "webhook-measure-6f12692ccec4-postgres-1",
+        "NetIO": "545kB / 413kB",
+        "PIDs": "26"
+      }
+    },
+    {
+      "captured_at": "2026-09-20T01:21:57.3129685+00:00",
+      "container": {
+        "BlockIO": "16.9MB / 0B",
+        "CPUPerc": "0.48%",
+        "Container": "e597e6f925451e4be562243b666580d9fd74ff7302d72a12bf28a46bb65e47c9",
+        "ID": "e597e6f92545",
+        "MemPerc": "0.04%",
+        "MemUsage": "6.172MiB / 15.58GiB",
+        "Name": "webhook-measure-6f12692ccec4-receiver-1",
+        "NetIO": "74.2kB / 17.8kB",
+        "PIDs": "12"
+      }
+    },
+    {
+      "captured_at": "2026-09-20T01:21:57.3129685+00:00",
+      "container": {
+        "BlockIO": "22MB / 0B",
+        "CPUPerc": "3.17%",
+        "Container": "16d17c746f4051f653a2b5a89bde94c98732044c9d26d21c7951a534ec33f6ff",
+        "ID": "16d17c746f40",
+        "MemPerc": "0.06%",
+        "MemUsage": "9.816MiB / 15.58GiB",
+        "Name": "webhook-measure-6f12692ccec4-worker-1",
+        "NetIO": "279kB / 351kB",
+        "PIDs": "20"
+      }
+    }
+  ]
+}

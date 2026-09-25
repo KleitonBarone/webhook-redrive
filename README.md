@@ -2,7 +2,7 @@
 
 Webhook Redrive accepts events, signs outbound requests, and keeps delivery history in PostgreSQL. It retries temporary failures, retains exhausted deliveries, and supports audited manual replay. One HTTP service and one worker process share one durable database.
 
-Milestones 0 through 8 are implemented. The project targets a small team self-hosting outbound webhook delivery. It includes controlled access, ingestion idempotency, audited endpoint maintenance, event investigation, resumable bulk recovery, opt-in retention, and database/key recovery procedures. It is not a production deployment.
+Milestones 0 through 9 are implemented. The project targets a small team self-hosting outbound webhook delivery. It includes controlled access, ingestion idempotency, audited endpoint maintenance, event investigation, resumable bulk recovery, opt-in retention, database/key recovery procedures, and fair claiming between endpoint backlogs. It is not a production deployment.
 
 ## Run the demo
 
@@ -140,7 +140,7 @@ The race detector requires CGO and a C compiler. Tests create and drop uniquely 
 
 The API and worker require `DATABASE_URL`, `MASTER_KEY` as a base64-encoded 32-byte AES key, and `DESTINATION_POLICY_FILE`. Startup rejects a key that does not match the database. Compose supplies synthetic local values and a mounted demo policy. Worker defaults are `OUTBOUND_TIMEOUT=2s`, `CLAIM_LEASE=10s`, `POLL_PERIOD=250ms`, and `BATCH_SIZE=10`. The lease must exceed the request timeout; batch size must be 1..1000. `API_ADDR` defaults to `:8080`. Both processes export OpenTelemetry spans to stdout by default; set `TRACE_EXPORTER=none` to disable export, or `otlp` with an explicit collector endpoint as described in [telemetry setup](docs/observability.md).
 
-`BATCH_SIZE` bounds in-flight deliveries per worker. Each completion frees a slot for another claim; a slow request does not hold a whole batch open. `POLL_PERIOD` discovers new or delayed work and retries failed claims. Endpoint limits still apply across workers. This is not strict fairness: slow endpoints can block healthy work if they occupy all slots. See [worker scheduling](docs/decisions/0004-worker-scheduling.md).
+`BATCH_SIZE` bounds in-flight deliveries per worker. Each completion frees a slot for another claim; a slow request does not hold a whole batch open. `POLL_PERIOD` discovers new or delayed work and retries failed claims. Free slots go first to eligible endpoints with fewer live claims, rotating equal-occupancy endpoints by recent service. PostgreSQL preserves service order across restarts and enforces endpoint limits across workers. An endpoint alone can use all available slots up to its limits. Already-running requests still occupy their slots, so this is not a latency guarantee or tenant isolation. See [fair claiming](docs/decisions/0010-endpoint-fair-claiming.md).
 
 Both binaries apply embedded migrations at startup under an advisory lock. To upgrade, stop the API and worker, rebuild, and start both together. Migration 002 preserves event history and leaves existing failures terminal until replayed. Migration 003 adds durable trace context; older attempts begin without an ingestion trace. Mixed versions are unsupported.
 
@@ -154,9 +154,11 @@ Migration 007 adds optional producer references, search indexes, and durable bul
 
 Migration 008 backfills cumulative metrics before any history can be deleted, adds worker progress and a wrapping-key marker, and records maintenance audit. Cleanup is opt-in through `admin retain`; its default preview uses a 90-day horizon and 100-item bound. Applying cleanup removes terminal history and its ingestion/replay deduplication together, so deleted events cannot be replayed. Offline wrapping-key rotation uses `admin rotate-master-key`. Read [operations](docs/operations.md) before running either command or upgrading a populated database.
 
+Migration 009 adds endpoint service order and its database sequence. Existing endpoints start as never served; delivery history and configuration versions stay unchanged. Stop and upgrade all API/worker processes together. Full PostgreSQL backups preserve both the sequence and service order.
+
 ## Next steps
 
-Fairer endpoint claiming remains the next evidence-driven candidate, not a production rollout commitment. Existing [load measurements](docs/benchmarks/sustained/README.md) predate authentication; [milestone 8 verification](docs/verification/milestone-8/README.md) covers operational recovery and two-worker local checks. Neither establishes production capacity. See [ROADMAP.md](ROADMAP.md).
+The numbered roadmap is complete through milestone 9. [Fair-claiming comparisons](docs/verification/milestone-9/README.md) show lower healthy-delivery delay under local saturation, with the rejected policy and raw reports retained. These measurements do not establish production capacity. Circuit breaking and further queue optimization remain optional work, subject to demonstrated need. See [ROADMAP.md](ROADMAP.md).
 
 ## License
 

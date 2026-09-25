@@ -4,7 +4,7 @@
 
 Webhook Redrive is a reliable webhook delivery service. The hard parts are delivery state, retries, duplicate handling, signatures, and enough telemetry to explain every attempt.
 
-Read `README.md` and `ROADMAP.md` before changing scope. Milestones 0 through 8 are implemented. Local load evidence is in `docs/benchmarks/README.md`; it predates authentication and is not production capacity. Newer operational evidence is in `docs/verification/milestone-8/README.md`.
+Read `README.md` and `ROADMAP.md` before changing scope. Milestones 0 through 9 are implemented. Local load evidence is in `docs/benchmarks/README.md`; it predates authentication and is not production capacity. Operational recovery evidence is in `docs/verification/milestone-8/README.md`; fair-claiming comparisons and restore checks are in `docs/verification/milestone-9/README.md`.
 
 ## Product rules
 
@@ -38,6 +38,8 @@ The repository uses Go 1.24, `net/http`, pgx v5, and PostgreSQL 17. Keep one Go 
 `examples/orders` belongs to a reference application's schema, not delivery migrations. Its outbox and receiver demo add no required deployed service. Keep its business writes separate from the delivery store.
 
 Read `docs/decisions/0004-worker-scheduling.md` before changing worker polling or dispatch concurrency. Keep claims bounded by free local slots, preserve shutdown waiting, and do not describe completion-driven scheduling as strict endpoint fairness.
+
+Read `docs/decisions/0010-endpoint-fair-claiming.md` before changing claim selection. Balance live plus newly allocated claims, rotate equal-occupancy endpoints by recent service, and persist final service order with leases and permits. Keep sequence gaps harmless on rollback, preserve capacity for a lone eligible endpoint, and do not promise global round-robin order or latency isolation under concurrent claims.
 
 ## Verification
 

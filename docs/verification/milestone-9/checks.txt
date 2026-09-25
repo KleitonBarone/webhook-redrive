@@ -1,0 +1,29 @@
+ok  	github.com/KleitonBarone/webhook-redrive/cmd/admin	1.877s
+?   	github.com/KleitonBarone/webhook-redrive/cmd/api	[no test files]
+ok  	github.com/KleitonBarone/webhook-redrive/cmd/loadtest	1.033s
+ok  	github.com/KleitonBarone/webhook-redrive/cmd/receiver	1.021s
+?   	github.com/KleitonBarone/webhook-redrive/cmd/worker	[no test files]
+ok  	github.com/KleitonBarone/webhook-redrive/examples/orders	1.917s
+ok  	github.com/KleitonBarone/webhook-redrive/internal/auth	1.025s
+?   	github.com/KleitonBarone/webhook-redrive/internal/clock	[no test files]
+?   	github.com/KleitonBarone/webhook-redrive/internal/config	[no test files]
+ok  	github.com/KleitonBarone/webhook-redrive/internal/delivery	1.234s
+ok  	github.com/KleitonBarone/webhook-redrive/internal/destination	1.067s
+ok  	github.com/KleitonBarone/webhook-redrive/internal/httpapi	1.106s
+?   	github.com/KleitonBarone/webhook-redrive/internal/id	[no test files]
+ok  	github.com/KleitonBarone/webhook-redrive/internal/integration	6.040s
+ok  	github.com/KleitonBarone/webhook-redrive/internal/logsafe	1.025s
+ok  	github.com/KleitonBarone/webhook-redrive/internal/retry	1.016s
+ok  	github.com/KleitonBarone/webhook-redrive/internal/secret	1.015s
+ok  	github.com/KleitonBarone/webhook-redrive/internal/store	18.942s
+ok  	github.com/KleitonBarone/webhook-redrive/internal/telemetry	1.128s
+?   	github.com/KleitonBarone/webhook-redrive/internal/testdb	[no test files]
+?   	github.com/KleitonBarone/webhook-redrive/migrations	[no test files]
+ok  	github.com/KleitonBarone/webhook-redrive/signature	1.025s
+=== RUN   TestOperationsMigrationBackfillsMetrics
+--- PASS: TestOperationsMigrationBackfillsMetrics (0.41s)
+=== RUN   TestOperationsLargeHistory
+    operations_integration_test.go:234: {"database_bytes":42997427,"metrics_seconds":0.022261116,"remaining_events":9900,"retention_100_seconds":0.611096319,"search_page_seconds":0.005342873,"seed_seconds":5.831442037,"seeded_events":10000}
+--- PASS: TestOperationsLargeHistory (6.84s)
+PASS
+ok  	github.com/KleitonBarone/webhook-redrive/internal/store	8.263s

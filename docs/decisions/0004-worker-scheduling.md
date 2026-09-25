@@ -2,6 +2,9 @@
 
 Status: accepted on 2026-09-11.
 
+[Endpoint-fair claiming](0010-endpoint-fair-claiming.md) adds selection policy in
+milestone 9. The free-slot scheduling loop described here is unchanged.
+
 ## Problem
 
 The milestone 3 worker claimed a batch, waited for every delivery in it, then waited for a poll tick. Ten fast deliveries per 250 ms tick limited progress even with queued work. A slow request also kept already-free slots idle until the entire batch finished. Lowering the poll period addresses only the first delay.

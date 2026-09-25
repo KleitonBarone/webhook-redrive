@@ -115,6 +115,12 @@ On Windows with Docker Engine in WSL, append `-WSLDistro Ubuntu`. Keep a WSL ter
 
 The opt-in `compose.benchmark.yml` enables PostgreSQL statement statistics and I/O timing. The script saves `load.json` plus `database-and-resources.json` under a new directory in `artifacts/benchmark`. Source edits in implementation paths add `-dirty` to the revision label. Neither SQL text nor bind values enter saved evidence. Do not enable this configuration on a live database.
 
+For before/after experiments, `-ComposeOverride <file>` appends a local Compose
+override, such as builds from frozen baseline binaries. The revision label still
+describes the invoking checkout, not overridden binaries. Publish their actual
+source revision, build commands, and binary hashes with the reports. Do not mix
+different worker settings or measurement code without identifying that difference.
+
 Before/after SQL snapshots group statement calls, execution milliseconds, buffer activity, and WAL bytes. Subtract matching groups; absent groups start at zero. Reject comparisons if statistics reset or entries were evicted. Execution time is not CPU time and excludes planning unless separately tracked. The snapshot interval includes setup, ingestion, drain, history verification, and observation. Database cumulative counters can lag active backends. See PostgreSQL's [statement statistics](https://www.postgresql.org/docs/17/pgstatstatements.html) and [cumulative statistics](https://www.postgresql.org/docs/17/monitoring-stats.html) definitions.
 
 The `claim_endpoints` group's call count measures claim-selection queries, including empty polls. `claim_attempts` counts claim CTE executions, not individual leases. Their rows count claimed attempts. The `metrics` group covers grouped attempt queries, not the entire exporter. `other` includes ingestion, completion, history reads, authentication lookups, and unmatched statements. `observer` isolates the statistics query itself. Published milestone 3 timings predate authentication and do not measure its cost.

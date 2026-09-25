@@ -46,6 +46,8 @@ try {
     $pending = Invoke-RestMethod -Method Post -Uri "$source/v1/endpoints/$($endpoint.id)/events" -Headers $eventHeaders -ContentType application/json -Body $body
     $sourceStopped = $true
     $null = SourceCompose stop api worker
+    $serviceQuery = "SELECT json_build_object('sequence_value',(SELECT last_value FROM endpoint_service_sequence),'sequence_called',(SELECT is_called FROM endpoint_service_sequence),'endpoints',coalesce((SELECT jsonb_object_agg(id,last_service_seq) FROM webhook_endpoints),'{}'::jsonb))"
+    $serviceOrder = (SourceCompose exec -T postgres psql -U webhook_redrive -d webhook_redrive -At -v ON_ERROR_STOP=1 -c $serviceQuery | Out-String).Trim()
     $null = SourceCompose exec -T postgres pg_dump -U webhook_redrive -d webhook_redrive -Fc --no-owner --no-acl -f /tmp/synthetic-recovery.dump
     $null = TargetCompose up -d postgres --wait
     $sourceID = (SourceCompose ps -q postgres | Out-String).Trim()
@@ -58,6 +60,8 @@ try {
     Docker cp "${sourceID}:/tmp/synthetic-recovery.dump" "$artifact/backup.dump"
     Docker cp "$artifact/backup.dump" "${targetID}:/tmp/synthetic-recovery.dump"
     $null = TargetCompose exec -T postgres pg_restore -U webhook_redrive -d webhook_redrive --exit-on-error --no-owner --no-acl /tmp/synthetic-recovery.dump
+    $restoredOrder = (TargetCompose exec -T postgres psql -U webhook_redrive -d webhook_redrive -At -v ON_ERROR_STOP=1 -c $serviceQuery | Out-String).Trim()
+    if ($serviceOrder -ne $restoredOrder) { throw 'Restore changed endpoint service order or its sequence.' }
     # Verify the restored ciphertext with the backup's key, then atomically rotate
     # it before any restored service starts. Endpoint signing secrets do not change.
     foreach ($service in @('api','worker','receiver')) {
@@ -79,7 +83,9 @@ try {
     $deliveries = @((Invoke-RestMethod 'http://localhost:19090/deliveries').deliveries | Where-Object event_id -eq $pending.id)
     $digest = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($body))).ToLowerInvariant()
     if ($deliveries.Count -ne 1 -or -not $deliveries[0].signature_valid -or $deliveries[0].body_sha256 -ne $digest) { throw 'Restored delivery changed bytes or signing key.' }
-    [pscustomobject]@{ source_project = $SourceProject; restore_project = $target; history_preserved = $true; keyed_receipt_preserved = $true; wrapping_key_rotated = $true; pending_delivered = $true; signature_valid = $true; dump = "$artifact/backup.dump" } | ConvertTo-Json
+    $afterOrder = (TargetCompose exec -T postgres psql -U webhook_redrive -d webhook_redrive -At -v ON_ERROR_STOP=1 -c $serviceQuery | Out-String).Trim() | ConvertFrom-Json
+    if ($afterOrder.endpoints.($endpoint.id) -le ($serviceOrder | ConvertFrom-Json).sequence_value) { throw 'Restored delivery did not advance service order beyond the backup sequence.' }
+    [pscustomobject]@{ source_project = $SourceProject; restore_project = $target; history_preserved = $true; keyed_receipt_preserved = $true; wrapping_key_rotated = $true; pending_delivered = $true; signature_valid = $true; service_order_preserved = $true; service_sequence_advanced = $true; dump = "$artifact/backup.dump" } | ConvertTo-Json
 } finally {
     $null = TargetCompose stop
     if ($sourceStopped) { $null = SourceCompose start api worker }

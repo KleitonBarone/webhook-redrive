@@ -1,0 +1,7 @@
+
+scenario                event_id                             state     attempts
+--------                --------                             -----     --------
+retry recovery          99f24cf5-956b-4466-900b-2edaefc879b7 succeeded        3
+dead letter then replay d19f8e5f-c0af-46c9-85bc-93a5cfa50d9d succeeded        4
+
+Verified pause/resume and endpoint audit, idempotent ingestion, key conflicts, seven signed deliveries, unchanged bytes, traces, metrics, authenticated replay, permission denial, destination rejection, and credential revocation.

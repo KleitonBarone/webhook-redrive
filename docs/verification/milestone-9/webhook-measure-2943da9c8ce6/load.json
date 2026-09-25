@@ -1,0 +1,420 @@
+{
+  "started_at": "2026-09-20T01:34:48.217917936Z",
+  "revision": "be8baaddc32c51c724b19f1d568cf38ee7c9d517-dirty",
+  "runtime": "go1.24.13 linux/amd64",
+  "scenario": "success",
+  "events": 3000,
+  "ingestion_concurrency": 10,
+  "payload_bytes": 256,
+  "ingestion_seconds": 21.687477351,
+  "drain_seconds": 11.898795088,
+  "total_seconds": 33.586272439,
+  "completed_events_per_second": 89.32220762064783,
+  "ingestion_ack_ms": {
+    "p50": 6.775829,
+    "p95": 12.026718,
+    "p99": 35.808465999999996
+  },
+  "event_completion_ms": {
+    "p50": 8282.19,
+    "p95": 11622.295,
+    "p99": 11774.568000000001
+  },
+  "completion_ms_by_receiver": {
+    "success": {
+      "p50": 8282.19,
+      "p95": 11622.295,
+      "p99": 11774.568000000001
+    }
+  },
+  "states": {
+    "succeeded": 3000
+  },
+  "attempts": 3000,
+  "verified_signed_unchanged_deliveries": 3000,
+  "trace_samples": {
+    "success": "c2a6eebcdce54e509c166c0bcc165f48"
+  },
+  "unfinished_after_ingestion": 1324,
+  "max_of_three_scrape_ms": 15.321576,
+  "committed_counter_deltas": {
+    "completed": 3000,
+    "webhook_claim_recoveries_total": 0,
+    "webhook_claims_total": 3000,
+    "webhook_events_accepted_total": 3000,
+    "webhook_replays_total": 0,
+    "webhook_retries_scheduled_total": 0
+  },
+  "target_ingestion_per_second": 150,
+  "max_pacing_lag_ms": 4.397158,
+  "queue_samples": [
+    {
+      "elapsed_seconds": 1.010939764,
+      "ready": 72,
+      "scheduled": 0,
+      "in_progress": 1,
+      "expired": 0,
+      "oldest_ready_seconds": 0.515566,
+      "completed": 66,
+      "scrape_ms": 10.034839999999999,
+      "clock_drift_ms": 0
+    },
+    {
+      "elapsed_seconds": 2.005207585,
+      "ready": 131,
+      "scheduled": 0,
+      "in_progress": 0,
+      "expired": 0,
+      "oldest_ready_seconds": 0.945747,
+      "completed": 146,
+      "scrape_ms": 4.548557,
+      "clock_drift_ms": 0.000011
+    },
+    {
+      "elapsed_seconds": 3.009399975,
+      "ready": 190,
+      "scheduled": 0,
+      "in_progress": 1,
+      "expired": 0,
+      "oldest_ready_seconds": 1.370338,
+      "completed": 225,
+      "scrape_ms": 9.07765,
+      "clock_drift_ms": 0.000011
+    },
+    {
+      "elapsed_seconds": 4.0060137,
+      "ready": 254,
+      "scheduled": 0,
+      "in_progress": 0,
+      "expired": 0,
+      "oldest_ready_seconds": 1.843804,
+      "completed": 299,
+      "scrape_ms": 5.395116,
+      "clock_drift_ms": 0.000001
+    },
+    {
+      "elapsed_seconds": 5.005899248,
+      "ready": 314,
+      "scheduled": 0,
+      "in_progress": 1,
+      "expired": 0,
+      "oldest_ready_seconds": 2.274501,
+      "completed": 377,
+      "scrape_ms": 4.891610999999999,
+      "clock_drift_ms": 0
+    },
+    {
+      "elapsed_seconds": 6.010651948,
+      "ready": 380,
+      "scheduled": 0,
+      "in_progress": 0,
+      "expired": 0,
+      "oldest_ready_seconds": 2.745701,
+      "completed": 451,
+      "scrape_ms": 9.956966,
+      "clock_drift_ms": 0
+    },
+    {
+      "elapsed_seconds": 7.005350581,
+      "ready": 439,
+      "scheduled": 0,
+      "in_progress": 0,
+      "expired": 0,
+      "oldest_ready_seconds": 3.17068,
+      "completed": 530,
+      "scrape_ms": 4.352692,
+      "clock_drift_ms": 0.000011
+    },
+    {
+      "elapsed_seconds": 8.003921941,
+      "ready": 498,
+      "scheduled": 0,
+      "in_progress": 1,
+      "expired": 0,
+      "oldest_ready_seconds": 3.596771,
+      "completed": 609,
+      "scrape_ms": 3.7669140000000003,
+      "clock_drift_ms": 0.000012
+    },
+    {
+      "elapsed_seconds": 9.004599917,
+      "ready": 554,
+      "scheduled": 0,
+      "in_progress": 1,
+      "expired": 0,
+      "oldest_ready_seconds": 3.997985,
+      "completed": 692,
+      "scrape_ms": 4.228537,
+      "clock_drift_ms": 0.000012
+    },
+    {
+      "elapsed_seconds": 10.007028624,
+      "ready": 609,
+      "scheduled": 0,
+      "in_progress": 1,
+      "expired": 0,
+      "oldest_ready_seconds": 4.392359,
+      "completed": 775,
+      "scrape_ms": 6.925065999999999,
+      "clock_drift_ms": 0.000012
+    },
+    {
+      "elapsed_seconds": 11.004607254,
+      "ready": 667,
+      "scheduled": 0,
+      "in_progress": 0,
+      "expired": 0,
+      "oldest_ready_seconds": 4.810322,
+      "completed": 857,
+      "scrape_ms": 4.452396,
+      "clock_drift_ms": -0.000028
+    },
+    {
+      "elapsed_seconds": 12.005319696,
+      "ready": 730,
+      "scheduled": 0,
+      "in_progress": 1,
+      "expired": 0,
+      "oldest_ready_seconds": 5.267662,
+      "completed": 931,
+      "scrape_ms": 4.822513,
+      "clock_drift_ms": 0.000002
+    },
+    {
+      "elapsed_seconds": 13.005126461,
+      "ready": 785,
+      "scheduled": 0,
+      "in_progress": 1,
+      "expired": 0,
+      "oldest_ready_seconds": 5.662885,
+      "completed": 1015,
+      "scrape_ms": 4.880018,
+      "clock_drift_ms": 0.000011
+    },
+    {
+      "elapsed_seconds": 14.009333454,
+      "ready": 845,
+      "scheduled": 0,
+      "in_progress": 1,
+      "expired": 0,
+      "oldest_ready_seconds": 6.100552,
+      "completed": 1093,
+      "scrape_ms": 9.238018,
+      "clock_drift_ms": -0.000009
+    },
+    {
+      "elapsed_seconds": 15.006548929,
+      "ready": 904,
+      "scheduled": 0,
+      "in_progress": 0,
+      "expired": 0,
+      "oldest_ready_seconds": 6.528457,
+      "completed": 1174,
+      "scrape_ms": 5.613329,
+      "clock_drift_ms": 0.000011
+    },
+    {
+      "elapsed_seconds": 16.005580691,
+      "ready": 963,
+      "scheduled": 0,
+      "in_progress": 1,
+      "expired": 0,
+      "oldest_ready_seconds": 6.954131,
+      "completed": 1253,
+      "scrape_ms": 5.285823000000001,
+      "clock_drift_ms": 0.000002
+    },
+    {
+      "elapsed_seconds": 17.006932701,
+      "ready": 1022,
+      "scheduled": 0,
+      "in_progress": 1,
+      "expired": 0,
+      "oldest_ready_seconds": 7.374125,
+      "completed": 1333,
+      "scrape_ms": 6.126887,
+      "clock_drift_ms": 0.000011
+    },
+    {
+      "elapsed_seconds": 18.010936813,
+      "ready": 1080,
+      "scheduled": 0,
+      "in_progress": 1,
+      "expired": 0,
+      "oldest_ready_seconds": 7.797559,
+      "completed": 1413,
+      "scrape_ms": 10.292439,
+      "clock_drift_ms": 0.000001
+    },
+    {
+      "elapsed_seconds": 19.01158495,
+      "ready": 1142,
+      "scheduled": 0,
+      "in_progress": 0,
+      "expired": 0,
+      "oldest_ready_seconds": 8.240666,
+      "completed": 1491,
+      "scrape_ms": 11.097945,
+      "clock_drift_ms": 0.000011
+    },
+    {
+      "elapsed_seconds": 20.033679116,
+      "ready": 1204,
+      "scheduled": 0,
+      "in_progress": 1,
+      "expired": 0,
+      "oldest_ready_seconds": 8.731684,
+      "completed": 1562,
+      "scrape_ms": 33.550879,
+      "clock_drift_ms": 0.000001
+    },
+    {
+      "elapsed_seconds": 21.011301137,
+      "ready": 1283,
+      "scheduled": 0,
+      "in_progress": 1,
+      "expired": 0,
+      "oldest_ready_seconds": 9.294741,
+      "completed": 1621,
+      "scrape_ms": 10.735941,
+      "clock_drift_ms": 0.000001
+    },
+    {
+      "elapsed_seconds": 22.007577034,
+      "ready": 1289,
+      "scheduled": 0,
+      "in_progress": 0,
+      "expired": 0,
+      "oldest_ready_seconds": 9.649897,
+      "completed": 1711,
+      "scrape_ms": 7.334078,
+      "clock_drift_ms": 0.000011
+    },
+    {
+      "elapsed_seconds": 23.006719764,
+      "ready": 1172,
+      "scheduled": 0,
+      "in_progress": 0,
+      "expired": 0,
+      "oldest_ready_seconds": 9.80286,
+      "completed": 1828,
+      "scrape_ms": 6.4838960000000005,
+      "clock_drift_ms": 0.000011
+    },
+    {
+      "elapsed_seconds": 24.006671794,
+      "ready": 1069,
+      "scheduled": 0,
+      "in_progress": 1,
+      "expired": 0,
+      "oldest_ready_seconds": 10.060198,
+      "completed": 1930,
+      "scrape_ms": 6.507803,
+      "clock_drift_ms": 0
+    },
+    {
+      "elapsed_seconds": 25.009675623,
+      "ready": 961,
+      "scheduled": 0,
+      "in_progress": 1,
+      "expired": 0,
+      "oldest_ready_seconds": 10.286744,
+      "completed": 2038,
+      "scrape_ms": 8.000126,
+      "clock_drift_ms": 0.000011
+    },
+    {
+      "elapsed_seconds": 26.005864762,
+      "ready": 849,
+      "scheduled": 0,
+      "in_progress": 1,
+      "expired": 0,
+      "oldest_ready_seconds": 10.476404,
+      "completed": 2150,
+      "scrape_ms": 5.658487,
+      "clock_drift_ms": 0.000011
+    },
+    {
+      "elapsed_seconds": 27.008046614,
+      "ready": 736,
+      "scheduled": 0,
+      "in_progress": 1,
+      "expired": 0,
+      "oldest_ready_seconds": 10.666266,
+      "completed": 2263,
+      "scrape_ms": 7.818716,
+      "clock_drift_ms": 0.000011
+    },
+    {
+      "elapsed_seconds": 28.009910246,
+      "ready": 624,
+      "scheduled": 0,
+      "in_progress": 0,
+      "expired": 0,
+      "oldest_ready_seconds": 10.854268,
+      "completed": 2376,
+      "scrape_ms": 9.548472,
+      "clock_drift_ms": 0.000011
+    },
+    {
+      "elapsed_seconds": 29.006324783,
+      "ready": 517,
+      "scheduled": 0,
+      "in_progress": 0,
+      "expired": 0,
+      "oldest_ready_seconds": 11.079699,
+      "completed": 2483,
+      "scrape_ms": 6.053388,
+      "clock_drift_ms": 0.000011
+    },
+    {
+      "elapsed_seconds": 30.005967684,
+      "ready": 405,
+      "scheduled": 0,
+      "in_progress": 1,
+      "expired": 0,
+      "oldest_ready_seconds": 11.273116,
+      "completed": 2594,
+      "scrape_ms": 5.640302,
+      "clock_drift_ms": 0.000001
+    },
+    {
+      "elapsed_seconds": 31.006779148,
+      "ready": 289,
+      "scheduled": 0,
+      "in_progress": 1,
+      "expired": 0,
+      "oldest_ready_seconds": 11.429981,
+      "completed": 2710,
+      "scrape_ms": 6.303866,
+      "clock_drift_ms": 0.000011
+    },
+    {
+      "elapsed_seconds": 32.007439417,
+      "ready": 173,
+      "scheduled": 0,
+      "in_progress": 1,
+      "expired": 0,
+      "oldest_ready_seconds": 11.565593,
+      "completed": 2826,
+      "scrape_ms": 7.1789380000000005,
+      "clock_drift_ms": 0.000011
+    },
+    {
+      "elapsed_seconds": 33.008454812,
+      "ready": 58,
+      "scheduled": 0,
+      "in_progress": 0,
+      "expired": 0,
+      "oldest_ready_seconds": 11.733054,
+      "completed": 2942,
+      "scrape_ms": 7.622254,
+      "clock_drift_ms": 0.000011
+    }
+  ],
+  "timing_check": {
+    "valid": true,
+    "max_clock_drift_ms": 0.000028,
+    "inconsistent_events": 0
+  }
+}

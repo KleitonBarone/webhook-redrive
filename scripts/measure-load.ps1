@@ -5,6 +5,7 @@ param(
     [ValidateRange(1,10)][int]$SlowEndpoints = 1,
     [ValidateRange(1,10)][int]$SlowConcurrency = 10,
     [string]$OutputDirectory = 'artifacts/benchmark',
+    [string]$ComposeOverride = '',
     [string]$WSLDistro = ''
 )
 
@@ -42,6 +43,7 @@ if ($WSLDistro) {
     $env:BENCHMARK_OUTPUT_DIR = $wslOutput.Trim()
 }
 $compose = @('compose','-p',$project,'-f','compose.yml','-f','compose.benchmark.yml')
+if ($ComposeOverride) { $compose += @('-f',$ComposeOverride) }
 $samplerJob = $null
 try {
     Write-Host "Measuring on new local project $project; data will be preserved."

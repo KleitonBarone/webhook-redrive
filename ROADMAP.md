@@ -6,9 +6,9 @@ This roadmap favors a small, explainable delivery system before distributed infr
 
 Target a small engineering team self-hosting outbound webhook delivery. Its application submits JSON events to known destinations; Webhook Redrive handles durable delivery, retries, signatures, and recovery.
 
-Milestones 0 through 7 and the measured follow-ups are complete. The delivery engine has authenticated access, controlled destinations, ingestion idempotency, producer/receiver reference code, audited endpoint maintenance, planned signing rotation, event search, and resumable bulk recovery. This is not a production-readiness claim. Data retention remains unbounded and backup/key recovery has not been demonstrated.
+Milestones 0 through 9 and the measured follow-ups are complete. The delivery engine has authenticated access, controlled destinations, ingestion idempotency, producer/receiver reference code, audited endpoint maintenance, planned signing rotation, event search, resumable bulk recovery, opt-in retention, demonstrated database/key recovery, and occupancy-aware fair claiming. This is not a production-readiness claim.
 
-The next priority is milestone 8: long-running operations and recovery evidence, before further scheduling optimization. Keep one HTTP service, one worker process, and PostgreSQL. These plans do not authorize deployment or access to live systems.
+No milestone 10 is defined. Further features require demonstrated need. Keep one HTTP service, one worker process, and PostgreSQL. These plans do not authorize deployment or access to live systems.
 
 ## 0. Foundation
 
@@ -64,7 +64,7 @@ This does not guarantee strict fairness when slow endpoints occupy all slots.
 - [x] Compare spare slots, one saturated endpoint, and several saturated endpoints
 - [x] Publish [raw results and limits](docs/benchmarks/sustained/README.md) and verify the measurement path in CI
 
-The evidence covers one-minute success workloads and finite timeout backlogs with one worker. Longer runs, larger histories, and multi-worker scaling remain unmeasured. Healthy-endpoint latency under full-slot saturation remains a product decision, not a guarantee.
+That evidence covers one-minute success workloads and finite timeout backlogs with one worker. Milestone 8 adds longer-load, larger-history, and two-worker correctness checks, but not a scaling estimate. Healthy-endpoint latency under full-slot saturation remains a product decision, not a guarantee.
 
 ## 4. Controlled access and safe destinations
 
@@ -147,22 +147,25 @@ Implemented with opt-in coordinated cleanup, retention-safe cumulative accountin
 
 Acceptance evidence: the Go 1.24 race-enabled PostgreSQL suite, static analysis, formatting, and seven synthetic alert-rule checks passed. A real dump/restore into a fresh local project preserved history and ingestion receipts, validated/decrypted secrets, rotated the wrapping key, and resumed signed unchanged pending delivery. Tests cover cleanup boundaries, rollback, batch pins, replay races, active intent, key expiry, and preserved cumulative accounting. A 10,000-event SQL history check removed 100 groups without changing totals. Two-worker success/mixed/fairness runs verified 1,880 events and 1,894 deliveries; the paced run lasted three minutes. Host-clock drift invalidated all three load timing reports, so they support correctness only.
 
-Cleanup is administrator-triggered, bounded by event groups and a command deadline, not a strict per-event row/byte cap. Key rotation is offline. Gauges still query retained state, and cumulative updates share one final transaction lock. No automatic backup scheduling, PITR, HA, production RPO/RTO, or monitoring service was added. The next candidate is endpoint-fair claiming below, subject to comparative evidence.
+Cleanup is administrator-triggered, bounded by event groups and a command deadline, not a strict per-event row/byte cap. Key rotation is offline. Gauges still query retained state, and cumulative updates share one final transaction lock. No automatic backup scheduling, PITR, HA, production RPO/RTO, or monitoring service was added. Milestone 9 adds the fair-claiming comparison below.
+
+## 9. Fair delivery under competing backlogs
+
+Implemented with live-claim balancing and durable recent-service rotation under the existing PostgreSQL endpoint locks. See [the decision](docs/decisions/0010-endpoint-fair-claiming.md) and [comparative evidence](docs/verification/milestone-9/README.md).
+
+- [x] Publish a current baseline and explain any measurement-environment changes
+- [x] Distribute free slots across eligible endpoints and persist recent service so rotation survives single-slot claim calls and worker restarts
+- [x] Preserve endpoint limits, atomic claims, lease fencing, and use of available capacity when only one endpoint is eligible
+- [x] Test competing backlogs, concurrent workers, restarts, and rate-limited endpoints
+- [x] Compare healthy latency, slow-backlog completion, successful-only throughput, and SQL cost against the existing measurements
+
+Acceptance evidence: eight clock-valid local runs verified 6,780 events and 6,960 signed unchanged deliveries. Healthy p95 under full-slot saturation fell from about 5.7 seconds to 1.8 and 1.7 seconds. Timeout-backlog p95 stayed within 4% of baseline. Successful-only throughput was 89 versus 85 events/s, with no observed SQL-cost regression. These are single-run observations, not capacity estimates. The initial equal-turn policy worsened latency and was rejected; its reports remain published.
+
+Formatting, static analysis, the full race-enabled PostgreSQL suite, the 10,000-event history check, alert rules, and the two-worker Compose demo passed. A real backup/restore preserved service order and its sequence, then advanced it on signed pending delivery after wrapping-key rotation. CI runs the new fixed-clock claim tests and recovery assertions without timing thresholds.
+
+This balances live claims between endpoint registrations, not tenants. In-flight requests still occupy slots until they finish or time out; concurrent claims do not promise strict global round-robin order or a hard latency bound. Reserved pools and health-based prioritization remain deferred. No broker or distributed service was added.
 
 ## Later, if justified
-
-### Endpoint-fair claiming
-
-The saturation evidence justifies investigating fairer claims, but adoption blockers above take priority. No fairness change is implemented yet.
-
-- [ ] Distribute free slots across eligible endpoints and persist recent service so rotation survives single-slot claim calls and worker restarts
-- [ ] Preserve endpoint limits, atomic claims, lease fencing, and use of available capacity when only one endpoint is eligible
-- [ ] Test competing backlogs, concurrent workers, restarts, and rate-limited endpoints
-- [ ] Compare healthy latency, slow-backlog completion, successful-only throughput, and SQL cost against the existing measurements
-
-Keep the change only if the evidence supports the tradeoff. This is fairness between endpoint registrations, not tenant isolation or a hard latency guarantee. In-flight requests still occupy slots until they finish or time out. Reserved pools and health-based prioritization remain deferred.
-
-### Other optional work
 
 - [ ] Endpoint circuit breaking
 - [ ] Evaluate whether the database queue has reached a measured limit

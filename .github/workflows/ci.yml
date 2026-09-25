@@ -21,7 +21,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U webhook_redrive -d webhook_redrive_test"
+          --health-cmd "pg_isready -h 127.0.0.1 -U webhook_redrive -d webhook_redrive_test"
           --health-interval 2s
           --health-timeout 2s
           --health-retries 15
