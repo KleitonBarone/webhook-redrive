@@ -1,0 +1,50 @@
+name: Outage evaluation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record native measurement environment
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts/outage-native | Out-Null
+          [ordered]@{
+            revision = $env:GITHUB_SHA
+            runner_os = $env:RUNNER_OS
+            kernel = (uname -sr | Out-String).Trim()
+            docker = (docker version --format '{{.Server.Version}}' | Out-String).Trim()
+            compose = (docker compose version --short | Out-String).Trim()
+            visible_cpus = [int](docker info --format '{{.NCPU}}')
+            visible_memory_bytes = [long](docker info --format '{{.MemTotal}}')
+            worker_count = 1
+            worker_slots = 10
+            outbound_timeout_seconds = 2
+            claim_lease_seconds = 10
+            poll_milliseconds = 250
+            receiver_delay_seconds = 3
+            timing_thresholds_are_ci_gates = $false
+          } | ConvertTo-Json | Set-Content artifacts/outage-native/environment.json
+      - name: Measure matched healthy arrival baseline
+        shell: pwsh
+        run: ./scripts/measure-load.ps1 -Scenario success -Events 180 -Rate 3 -OutputDirectory artifacts/outage-native/baseline
+      - name: Measure continuing outage with ten permits
+        shell: pwsh
+        run: ./scripts/measure-load.ps1 -Scenario outage -Events 360 -Rate 6 -SlowEndpoints 1 -SlowConcurrency 10 -OutputDirectory artifacts/outage-native/ten-permits
+      - name: Measure continuing outage with two permits
+        shell: pwsh
+        run: ./scripts/measure-load.ps1 -Scenario outage -Events 360 -Rate 6 -SlowEndpoints 1 -SlowConcurrency 2 -OutputDirectory artifacts/outage-native/two-permits
+      - name: Preserve raw evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: outage-native
+          path: artifacts/outage-native/**/*.json
+          if-no-files-found: error
