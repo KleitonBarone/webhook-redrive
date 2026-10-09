@@ -12,13 +12,13 @@ $newKey = 'AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE='
 $source = 'http://localhost:8080'
 $restored = 'http://localhost:18080'
 
-function Docker {
+function Invoke-Docker {
     if ($WSLDistro) { & wsl.exe -d $WSLDistro -- docker @args }
     else { & docker @args }
     if ($LASTEXITCODE -ne 0) { throw 'Recovery drill Docker command failed.' }
 }
-function SourceCompose { Docker compose -p $SourceProject @args }
-function TargetCompose { Docker compose -p $target -f compose.yml -f compose.recovery.yml @args }
+function SourceCompose { Invoke-Docker compose -p $SourceProject @args }
+function TargetCompose { Invoke-Docker compose -p $target -f compose.yml -f compose.recovery.yml @args }
 function Post([string]$url, $body) { Invoke-RestMethod -Method Post -Uri $url -Headers $headers -ContentType application/json -Body ($body | ConvertTo-Json -Depth 6) }
 function Wait-Success([string]$base, [string]$id) {
     $watch = [Diagnostics.Stopwatch]::StartNew()
@@ -57,8 +57,8 @@ try {
     if ($tables -ne '0') { throw 'Refusing to restore into a nonempty database.' }
     $artifact = "artifacts/recovery/$target"
     $null = New-Item -ItemType Directory -Path $artifact
-    Docker cp "${sourceID}:/tmp/synthetic-recovery.dump" "$artifact/backup.dump"
-    Docker cp "$artifact/backup.dump" "${targetID}:/tmp/synthetic-recovery.dump"
+    Invoke-Docker cp "${sourceID}:/tmp/synthetic-recovery.dump" "$artifact/backup.dump"
+    Invoke-Docker cp "$artifact/backup.dump" "${targetID}:/tmp/synthetic-recovery.dump"
     $null = TargetCompose exec -T postgres pg_restore -U webhook_redrive -d webhook_redrive --exit-on-error --no-owner --no-acl /tmp/synthetic-recovery.dump
     $restoredOrder = (TargetCompose exec -T postgres psql -U webhook_redrive -d webhook_redrive -At -v ON_ERROR_STOP=1 -c $serviceQuery | Out-String).Trim()
     if ($serviceOrder -ne $restoredOrder) { throw 'Restore changed endpoint service order or its sequence.' }
@@ -67,7 +67,7 @@ try {
     foreach ($service in @('api','worker','receiver')) {
         $network = @()
         if ($HostBuildNetwork) { $network = @('--network','host') }
-        $null = Docker build @network --target $service -t "${target}-$service" .
+        $null = Invoke-Docker build @network --target $service -t "${target}-$service" .
     }
     $preview = TargetCompose run --rm --no-deps -e "MASTER_KEY=$oldKey" -e "NEW_MASTER_KEY=$newKey" --entrypoint admin api rotate-master-key --offline | ConvertFrom-Json
     if ($preview.applied -or $preview.endpoints -lt 1) { throw 'Invalid rotation preview.' }
