@@ -72,6 +72,10 @@ Use `scripts/measure-load.ps1` for paced-load/database evidence. Its benchmark o
 The `outage` load scenario requires an even event count and positive rate. It
 alternates new timeout and healthy events, uses two-attempt `demo` cycles, and
 must not be described as the longer endpoint retry profile named `outage`.
+Its comparison and the circuit-breaker decision are in
+`docs/verification/outage-evaluation/README.md`. The manual native Linux workflow
+is available when local clock checks invalidate measurement; preserve rejected
+reports and never compare their timings with valid runs.
 
 Prioritize tests for state transitions, retry timing, concurrent claims, crash recovery, signature verification, rate limits, and replay. Use a controllable clock and deterministic jitter in tests.
 

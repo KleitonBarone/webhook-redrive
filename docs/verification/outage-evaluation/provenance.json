@@ -1,0 +1,69 @@
+{
+  "source_hash_algorithm": "SHA256",
+  "source_hashes": {
+    "cmd/loadtest/main.go": "6c8119c9dce70ed7d3e6a6dfd27ba202203ff26021ea9180d72ee13f66aca340",
+    "cmd/loadtest/measurement.go": "edf8076b653394d3560ff184654af8895aaddb9ae1ff647b0bf83a2e64b4c463",
+    "scripts/measure-load.ps1": "b2265cc73e8104771188ee4ea9fb62755a4e48ad11e9e40c2a3de406c81a62f1",
+    "internal/store/claims.go": "32c567001deeee46681e65f612b860cff27ebb842594ef20bfd0a2518e03f27a",
+    "internal/store/fairness.go": "416cff6b5513fddcf868890165f68ef0e60607851a78b35a9eb4a348cc828074"
+  },
+  "local": {
+    "revision": "cb3b6046b80ef1d095fded77fe64c2c6f721a788",
+    "os": "Windows host with Ubuntu 24.04.5 WSL2",
+    "kernel": "6.18.33.2-microsoft-standard-WSL2",
+    "cpu": "AMD Ryzen 7 5700X3D",
+    "physical_cores": 8,
+    "logical_processors": 16,
+    "docker_visible_cpus": 16,
+    "docker_visible_memory_bytes": 16728625152,
+    "docker": "29.8.0",
+    "compose": "5.5.1",
+    "project_subnets": {
+      "webhook-measure-414d94328775": "10.231.201.0/24",
+      "webhook-measure-990347f53758": "10.231.202.0/24",
+      "webhook-measure-b8742940dea8": "10.231.203.0/24"
+    },
+    "overrides": "Only host build networking and explicit new-project subnets; no runtime configuration or frozen binaries overridden.",
+    "timing_valid": false
+  },
+  "native_environment": {
+    "revision": "9ad10d7b556a2d305db322281231108ea113caee",
+    "runner_os": "Linux",
+    "kernel": "Linux 6.17.0-1022-azure",
+    "docker": "28.0.4",
+    "compose": "2.38.2",
+    "visible_cpus": 4,
+    "visible_memory_bytes": 16765378560,
+    "worker_count": 1,
+    "worker_slots": 10,
+    "outbound_timeout_seconds": 2,
+    "claim_lease_seconds": 10,
+    "poll_milliseconds": 250,
+    "receiver_delay_seconds": 3,
+    "timing_thresholds_are_ci_gates": false
+  },
+  "runtime_configuration": {
+    "worker_count": 1,
+    "worker_slots": 10,
+    "outbound_timeout_seconds": 2,
+    "claim_lease_seconds": 10,
+    "poll_milliseconds": 250,
+    "receiver_delay_seconds": 3,
+    "retry_profile": "demo",
+    "max_attempts": 2,
+    "endpoint_claim_rate_limit": 1000,
+    "healthy_concurrency_limit": 10,
+    "payload_bytes": 256,
+    "trace_exporter": "stdout",
+    "generator_network": "Linux host network"
+  },
+  "comparison_limits": [
+    "one observation per native case",
+    "finite one-minute ingestion followed by complete drain",
+    "one unavailable timeout endpoint",
+    "two-attempt short demo policy, not long outage retry profile",
+    "no receiver recovery, permanent-error mix, or crash injection",
+    "shared runner resources and observation overhead",
+    "local timing invalid and excluded"
+  ]
+}

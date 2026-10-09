@@ -140,3 +140,18 @@ Before/after SQL snapshots group statement calls, execution milliseconds, buffer
 The `claim_endpoints` group's call count measures claim-selection queries, including empty polls. `claim_attempts` counts claim CTE executions, not individual leases. Their rows count claimed attempts. The `metrics` group covers grouped attempt queries, not the entire exporter. `other` includes ingestion, completion, history reads, authentication lookups, and unmatched statements. `observer` isolates the statistics query itself. Published milestone 3 timings predate authentication and do not measure its cost.
 
 Container samples use `docker stats --no-stream`, followed by a five-second pause. Keep their actual timestamps; the effective interval includes command latency. CPU percentages can exceed 100% across cores, and sampled peaks can miss short spikes. Sampling excludes the load-generator container and is not an end-to-end CPU profile. [Published paced-load evidence](benchmarks/sustained/README.md) records the measured environment and remaining limits.
+
+### Repeat the outage evaluation on native Linux
+
+The optional `Outage evaluation` workflow runs a matched healthy baseline and
+ongoing timeout traffic with endpoint concurrency 10 and 2 on one GitHub Linux
+runner. It is manually dispatched and does not add timing thresholds to CI:
+
+```console
+gh workflow run outage-evaluation.yml --ref main
+```
+
+The `outage-native` artifact includes the environment and raw load/SQL/resource
+reports. Each case has a fresh local database on the runner. Review clock checks
+and statistics reset/eviction before comparing results. Shared-runner timing is
+an observation, not a production capacity estimate.

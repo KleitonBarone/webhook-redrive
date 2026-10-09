@@ -170,12 +170,22 @@ This balances live claims between endpoint registrations, not tenants. In-flight
 - [x] Correct native PowerShell Docker dispatch and verify the complete recovery CI job
 - [x] Verify a concise company-use-case walkthrough and publish an architecture overview
 - [x] Package the first source release, v0.1.0, with explicit maturity and contract limits
-- [ ] Measure ongoing ingestion during an unavailable receiver, compare existing endpoint limits, and decide whether circuit breaking warrants milestone 10
+- [x] Measure ongoing ingestion during an unavailable receiver, compare existing endpoint limits, and decide whether circuit breaking warrants milestone 10
 
 The [release verification](docs/verification/release-v0.1.0/README.md) records
 green CI after the recovery-script correction and the local walkthrough.
 Feature evaluation must publish its workload, raw results, and limits before
 changing delivery policy.
+
+The [outage evaluation](docs/verification/outage-evaluation/README.md) verified
+1,800 events and 2,520 deliveries across local and native Linux runs. Local
+timings were invalid and excluded. In the native comparison, healthy p95 was
+237 ms in the baseline, 467 ms with an unavailable endpoint allowed ten claims,
+and 234 ms with two claims. Both outage cases still made 360 timeout requests;
+lower concurrency increased queueing and drain. These are single observations
+for one failing endpoint with a short retry budget, not a guarantee across a fleet.
+Keep circuit breaking deferred and milestone 10 undefined. Revisit automatic
+receiver-pressure reduction with a real requirement and recovery/probe evidence.
 
 ## Later, if justified
 

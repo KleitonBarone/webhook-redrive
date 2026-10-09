@@ -167,8 +167,10 @@ The numbered roadmap is complete through milestone 9. The first source release
 is [v0.1.0](https://github.com/KleitonBarone/webhook-redrive/releases/tag/v0.1.0).
 [Fair-claiming comparisons](docs/verification/milestone-9/README.md) show lower
 healthy-delivery delay under local saturation, with the rejected policy and raw
-reports retained. An ongoing-ingestion outage evaluation compares existing
-endpoint limits before deciding whether circuit breaking deserves milestone 10.
+reports retained. The [ongoing-ingestion outage evaluation](docs/verification/outage-evaluation/README.md)
+found that the existing default endpoint concurrency protected healthy latency
+in its one-unavailable-endpoint case, while failed-request counts stayed unchanged.
+Circuit breaking remains deferred; no milestone 10 is defined.
 These measurements do not establish production capacity. See [ROADMAP.md](ROADMAP.md).
 
 ## License

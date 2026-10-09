@@ -1,0 +1,163 @@
+{
+  "decision": "defer_endpoint_circuit_breaking",
+  "reason": "The default two-permit setting matched healthy-baseline latency in this one-endpoint workload. Limits did not reduce failed requests; no breaker candidate or receiver-recovery benefit was measured.",
+  "native_workflow": "https://github.com/KleitonBarone/webhook-redrive/actions/runs/37874255859",
+  "native": [
+    {
+      "project": "webhook-measure-6497cdd7488b",
+      "revision": "9ad10d7b556a2d305db322281231108ea113caee",
+      "scenario": "success",
+      "slow_concurrency": null,
+      "events": 180,
+      "states": {
+        "succeeded": 180
+      },
+      "verified_deliveries": 180,
+      "failed_wire_requests": 0,
+      "retry_attempts": 0,
+      "unfinished_after_ingestion": 1,
+      "healthy_p95_ms": 236.71900000000002,
+      "timeout_p95_ms": null,
+      "total_seconds": 60.021114436,
+      "timing_check": {
+        "valid": true,
+        "max_clock_drift_ms": 0.000054,
+        "inconsistent_events": 0
+      },
+      "statement_statistics_reset_unchanged": true,
+      "statement_evictions": 0,
+      "deadlocks": 0
+    },
+    {
+      "project": "webhook-measure-ab55fe155c06",
+      "revision": "9ad10d7b556a2d305db322281231108ea113caee",
+      "scenario": "outage",
+      "slow_concurrency": 10,
+      "events": 360,
+      "states": {
+        "dead_letter": 180,
+        "succeeded": 180
+      },
+      "verified_deliveries": 540,
+      "failed_wire_requests": 360,
+      "retry_attempts": 180,
+      "unfinished_after_ingestion": 51,
+      "healthy_p95_ms": 467.27200000000005,
+      "timeout_p95_ms": 18525.716,
+      "total_seconds": 75.375755728,
+      "timing_check": {
+        "valid": true,
+        "max_clock_drift_ms": 0.000055,
+        "inconsistent_events": 0
+      },
+      "statement_statistics_reset_unchanged": true,
+      "statement_evictions": 0,
+      "deadlocks": 0
+    },
+    {
+      "project": "webhook-measure-b8349023f679",
+      "revision": "9ad10d7b556a2d305db322281231108ea113caee",
+      "scenario": "outage",
+      "slow_concurrency": 2,
+      "events": 360,
+      "states": {
+        "dead_letter": 180,
+        "succeeded": 180
+      },
+      "verified_deliveries": 540,
+      "failed_wire_requests": 360,
+      "retry_attempts": 180,
+      "unfinished_after_ingestion": 169,
+      "healthy_p95_ms": 234.024,
+      "timeout_p95_ms": 296417.559,
+      "total_seconds": 361.851065667,
+      "timing_check": {
+        "valid": true,
+        "max_clock_drift_ms": 0.000073,
+        "inconsistent_events": 0
+      },
+      "statement_statistics_reset_unchanged": true,
+      "statement_evictions": 0,
+      "deadlocks": 0
+    }
+  ],
+  "local_timing_rejected": [
+    {
+      "project": "webhook-measure-414d94328775",
+      "revision": "cb3b6046b80ef1d095fded77fe64c2c6f721a788",
+      "scenario": "success",
+      "slow_concurrency": null,
+      "events": 180,
+      "states": {
+        "succeeded": 180
+      },
+      "verified_deliveries": 180,
+      "failed_wire_requests": 0,
+      "retry_attempts": 0,
+      "unfinished_after_ingestion": 1,
+      "healthy_p95_ms": null,
+      "timeout_p95_ms": null,
+      "total_seconds": null,
+      "timing_check": {
+        "valid": false,
+        "max_clock_drift_ms": 1334.606409,
+        "inconsistent_events": 0
+      },
+      "statement_statistics_reset_unchanged": true,
+      "statement_evictions": 0,
+      "deadlocks": 0
+    },
+    {
+      "project": "webhook-measure-990347f53758",
+      "revision": "cb3b6046b80ef1d095fded77fe64c2c6f721a788",
+      "scenario": "outage",
+      "slow_concurrency": 10,
+      "events": 360,
+      "states": {
+        "dead_letter": 180,
+        "succeeded": 180
+      },
+      "verified_deliveries": 540,
+      "failed_wire_requests": 360,
+      "retry_attempts": 180,
+      "unfinished_after_ingestion": 52,
+      "healthy_p95_ms": null,
+      "timeout_p95_ms": null,
+      "total_seconds": null,
+      "timing_check": {
+        "valid": false,
+        "max_clock_drift_ms": 1335.750352,
+        "inconsistent_events": 48
+      },
+      "statement_statistics_reset_unchanged": true,
+      "statement_evictions": 0,
+      "deadlocks": 0
+    },
+    {
+      "project": "webhook-measure-b8742940dea8",
+      "revision": "cb3b6046b80ef1d095fded77fe64c2c6f721a788",
+      "scenario": "outage",
+      "slow_concurrency": 2,
+      "events": 360,
+      "states": {
+        "dead_letter": 180,
+        "succeeded": 180
+      },
+      "verified_deliveries": 540,
+      "failed_wire_requests": 360,
+      "retry_attempts": 180,
+      "unfinished_after_ingestion": 170,
+      "healthy_p95_ms": null,
+      "timeout_p95_ms": null,
+      "total_seconds": null,
+      "timing_check": {
+        "valid": false,
+        "max_clock_drift_ms": 7436.473374,
+        "inconsistent_events": 169
+      },
+      "statement_statistics_reset_unchanged": true,
+      "statement_evictions": 0,
+      "deadlocks": 0
+    }
+  ]
+}

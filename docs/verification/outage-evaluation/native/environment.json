@@ -1,0 +1,16 @@
+{
+  "revision": "9ad10d7b556a2d305db322281231108ea113caee",
+  "runner_os": "Linux",
+  "kernel": "Linux 6.17.0-1022-azure",
+  "docker": "28.0.4",
+  "compose": "2.38.2",
+  "visible_cpus": 4,
+  "visible_memory_bytes": 16765378560,
+  "worker_count": 1,
+  "worker_slots": 10,
+  "outbound_timeout_seconds": 2,
+  "claim_lease_seconds": 10,
+  "poll_milliseconds": 250,
+  "receiver_delay_seconds": 3,
+  "timing_thresholds_are_ci_gates": false
+}
