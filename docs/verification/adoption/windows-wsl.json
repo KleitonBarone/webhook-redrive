@@ -1,0 +1,29 @@
+{
+  "revision": "3a6f75e9bb5f700396c1dfc1d8d4503affaf8aba",
+  "verified_at_utc": "2026-10-09T21:04:41.1319395Z",
+  "worktree_modified": true,
+  "project": "webhook-redrive-adoption-9c33570b",
+  "subnet": "10.231.206.0/24",
+  "author_performed": true,
+  "fresh_database": true,
+  "public_demo_credential_rejected": true,
+  "worker_sigkill_exit_code": 137,
+  "receiver_process_restarted": true,
+  "logs_redacted": true,
+  "go_checks": true,
+  "go_mod_sha256": "dfd79a74c8fb56884e1151f75315b4feb5050835f17328986be5ba22a236ee0a",
+  "api_image": "sha256:df4797bc435ce9d1cdb244efec46903a6c37c73e5ce0753a41a2253d03ee0e4f",
+  "worker_image": "sha256:9c6c88b0645832d526babb3c27026ece444a13757a451b46deee61f92dca05d1",
+  "contract": {
+    "events": 4,
+    "verified_deliveries": 7,
+    "business_actions": 4,
+    "exact_bytes": true,
+    "keyed_acceptance_preserved": true,
+    "duplicate_processing_prevented": true,
+    "worker_claim_recovered": true,
+    "database_reconnected": true,
+    "audited_replay_preserved_history": true,
+    "tls_hostname_checked": true
+  }
+}

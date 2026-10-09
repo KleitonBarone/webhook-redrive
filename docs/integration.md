@@ -15,7 +15,7 @@ $env:TEST_DATABASE_URL = "postgres://webhook_redrive:local-only-password@localho
 go test -race -count=1 -v ./internal/integration -run '^TestOutboxToReceiverDemo$'
 ```
 
-Use Go 1.24 or newer with a C compiler for the race detector. The demo starts real HTTP handlers on loopback, uses PostgreSQL, and creates isolated application and delivery schemas. It drops only those generated test schemas afterward. It does not modify existing demo tables or require another service.
+Use Go 1.26 or newer with a C compiler for the race detector. The demo starts real HTTP handlers on loopback, uses PostgreSQL, and creates isolated application and delivery schemas. It drops only those generated test schemas afterward. It does not modify existing demo tables or require another service.
 
 The demo deliberately disconnects an API response after acceptance and simulates a worker stopping after the receiver commits. It also closes and recreates the producer's database pool after its business transaction. A controllable clock advances retry and lease deadlines without sleeps. The asserted result is one order, one accepted event, two webhook deliveries, and one receiver business action. These are commit-boundary fault injections, not OS process-kill or power-loss tests.
 
@@ -56,6 +56,10 @@ The [receiver](../examples/orders/receiver.go) verifies the exact bytes before p
 Install [schema.sql](../examples/orders/schema.sql) only in a dedicated application schema or database, not the delivery schema. The demo uses one PostgreSQL instance with isolated schemas; production applications own their business transactions independently. Give independent integrations separate receipt namespaces and secrets. Retain receipts for the full possible retry/replay lifetime. External side effects such as sending email need their own idempotency mechanism or transactional outbox. This example does not make them exactly once.
 
 ## Verify signatures in Go or another language
+
+The [TypeScript consumer](../examples/typescript) implements this wire contract
+without importing Go code. The [local adoption rehearsal](adoption.md) verifies
+interop and receiver receipt durability across actual process restarts.
 
 Go receivers can import `github.com/KleitonBarone/webhook-redrive/signature` from a revision containing milestone 5. There are no third-party dependencies in that package. Read a bounded request body once, then call:
 

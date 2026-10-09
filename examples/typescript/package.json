@@ -1,0 +1,14 @@
+{
+  "name": "webhook-redrive-consumer-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "node --test signature.test.ts"
+  },
+  "engines": { "node": ">=24 <25" },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "typescript": "5.9.3"
+  }
+}

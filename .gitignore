@@ -3,3 +3,4 @@ coverage.out
 webhook-redrive
 *.exe
 artifacts/
+node_modules/

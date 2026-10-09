@@ -1,0 +1,70 @@
+# Synthetic local rehearsal only. No public demo credential seed or published API/DB port.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: webhook_redrive
+      POSTGRES_USER: webhook_redrive
+      POSTGRES_PASSWORD: ${ADOPTION_DATABASE_PASSWORD:?}
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U webhook_redrive -d webhook_redrive]
+      interval: 1s
+      timeout: 2s
+      retries: 30
+  api:
+    image: ${ADOPTION_PROJECT:?}-api
+    environment: &application
+      DATABASE_URL: postgres://webhook_redrive:${ADOPTION_DATABASE_PASSWORD:?}@postgres:5432/webhook_redrive?sslmode=disable
+      MASTER_KEY: ${ADOPTION_MASTER_KEY:?}
+      DESTINATION_POLICY_FILE: /local/destinations.json
+      TRACE_EXPORTER: none
+    volumes:
+      - ${ADOPTION_LOCAL_DIRECTORY:?}:/local:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1:8080/readyz]
+      interval: 1s
+      timeout: 2s
+      retries: 30
+  worker:
+    image: ${ADOPTION_PROJECT:?}-worker
+    environment:
+      <<: *application
+      SSL_CERT_FILE: /local/ca.crt
+      OUTBOUND_TIMEOUT: 15s
+      CLAIM_LEASE: 20s
+      POLL_PERIOD: 200ms
+      BATCH_SIZE: 2
+    volumes:
+      - ${ADOPTION_LOCAL_DIRECTORY:?}:/local:ro
+    depends_on:
+      api: { condition: service_healthy }
+      consumer: { condition: service_healthy }
+  consumer:
+    image: node:24.20.0-bookworm-slim
+    working_dir: /example
+    command: [node, server.ts]
+    environment:
+      NODE_EXTRA_CA_CERTS: /local/ca.crt
+    volumes:
+      - ./:/example:ro
+      - ${ADOPTION_LOCAL_DIRECTORY:?}:/local
+      - consumer-data:/data
+    ports:
+      - 127.0.0.1:${ADOPTION_TLS_PORT:-18443}:8443
+    healthcheck:
+      test: [CMD, node, -e, "fetch('https://localhost:8443/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${ADOPTION_SUBNET:-10.231.204.0/24}
+volumes:
+  database:
+  consumer-data:

@@ -187,6 +187,31 @@ for one failing endpoint with a short retry budget, not a guarantee across a fle
 Keep circuit breaking deferred and milestone 10 undefined. Revisit automatic
 receiver-pressure reduction with a real requirement and recovery/probe evidence.
 
+## Security maintenance and author-performed adoption verification
+
+This bounded follow-up adds no delivery feature or required service. It is an
+author-performed installation and interoperability check, not independent user
+feedback or a production-readiness claim.
+
+- [x] Move builds and CI to a supported patched Go release; check Go dependencies and runtime images for known vulnerabilities
+- [x] Verify a small TypeScript producer/receiver against the public HTTP and exact-byte signature contracts, without importing delivery internals
+- [x] Rehearse a fresh isolated local installation with new synthetic credentials, an explicit destination policy, and TLS
+- [x] Exercise actual worker termination, database interruption, and receiver failure; record acceptance, recovery, duplicate handling, and log-redaction evidence
+
+Reuse existing backup, lifecycle, and transaction-boundary checks. Keep the
+consumer an example, use no frontend framework or SDK generator, and leave
+enterprise isolation, dashboards, circuit breaking, and infrastructure out of
+this follow-up.
+
+The [rehearsal guide](docs/adoption.md) and [verification record](docs/verification/adoption/README.md)
+cover fresh credentials, trusted local HTTPS, exact-byte signatures, worker
+SIGKILL after receiver commit, durable receiver deduplication after restart,
+database fail-closed/reconnection behavior, and audited replay without changed
+history. Go builds use 1.26.9; security-driven dependency updates preserve the
+existing module, API, and schema. These changes are packaged in v0.1.1. CI includes
+the source/image checks and rehearsal; the verification record distinguishes the
+initial local evidence from release-time CI.
+
 ## Later, if justified
 
 - [ ] Endpoint circuit breaking

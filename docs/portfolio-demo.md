@@ -7,7 +7,7 @@ the accepted event or losing its history.
 
 This walkthrough uses synthetic orders, credentials, and receivers on loopback.
 Allow additional time for the first image build. Docker Compose and PowerShell 7
-are required; the application transaction demo also needs Go 1.24 or newer and a
+are required; the application transaction demo also needs Go 1.26 or newer and a
 C compiler for the race detector.
 
 ## 1. Start the delivery service

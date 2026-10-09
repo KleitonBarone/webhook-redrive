@@ -1,0 +1,60 @@
+{
+  "measured_at_utc": "2026-10-09T21:10:26.6919591Z",
+  "parent_revision": "3a6f75e9bb5f700396c1dfc1d8d4503affaf8aba",
+  "worktree_modified": true,
+  "go_mod_sha256": "dfd79a74c8fb56884e1151f75315b4feb5050835f17328986be5ba22a236ee0a",
+  "baseline": {
+    "advisory_ids": [
+      "GO-2026-4394",
+      "GO-2026-4985",
+      "GO-2026-5004",
+      "GO-2026-5026",
+      "GO-2026-5506",
+      "GO-2026-5970",
+      "GO-2026-5972",
+      "GO-2026-6061",
+      "GO-2026-6088",
+      "GO-2026-6089",
+      "GO-2026-6090",
+      "GO-2026-6091",
+      "GO-2026-6218",
+      "GO-2026-6348",
+      "GO-2026-6505",
+      "GO-2026-6599",
+      "GO-2026-6600",
+      "GO-2026-6603",
+      "GO-2026-6605",
+      "GO-2026-6607",
+      "GO-2026-6608",
+      "GO-2026-6610",
+      "GO-2026-6611",
+      "GO-2026-6612",
+      "GO-2026-6613",
+      "GO-2026-6617",
+      "GO-2026-6629"
+    ],
+    "symbol_advisories": 27,
+    "go": "go1.26.5"
+  },
+  "final_source": {
+    "findings": 0,
+    "scanner": "govulncheck v1.8.0",
+    "database_updated_at": "2026-10-08T22:31:09Z",
+    "go": "go1.26.9"
+  },
+  "image_scan": {
+    "severities": "all",
+    "scanner": "Trivy 0.75.0",
+    "ignored_advisories": [],
+    "api": {
+      "findings": 0,
+      "image": "webhook-redrive-adoption-9c33570b-api",
+      "image_id": "sha256:df4797bc435ce9d1cdb244efec46903a6c37c73e5ce0753a41a2253d03ee0e4f"
+    },
+    "worker": {
+      "findings": 0,
+      "image": "webhook-redrive-adoption-9c33570b-worker",
+      "image_id": "sha256:9c6c88b0645832d526babb3c27026ece444a13757a451b46deee61f92dca05d1"
+    }
+  }
+}

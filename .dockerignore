@@ -4,3 +4,4 @@
 Dockerfile
 compose.yml
 artifacts/
+**/node_modules/

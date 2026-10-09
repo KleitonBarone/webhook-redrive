@@ -33,7 +33,7 @@ are in `docs/architecture.md`. Release verification belongs in
 
 Start with one HTTP service, one worker process, and one durable database. Do not add a broker, scheduler cluster, Kubernetes, or multiple deployable services without a measured limitation and an architecture decision.
 
-The repository uses Go 1.24, `net/http`, pgx v5, and PostgreSQL 17. Keep one Go module with `cmd/api`, `cmd/worker`, and `cmd/receiver`. See `docs/decisions/0001-foundation.md` before changing these choices.
+The repository uses Go 1.26.9, `net/http`, pgx v5, and PostgreSQL 17. Keep one Go module with `cmd/api`, `cmd/worker`, and `cmd/receiver`. See `docs/decisions/0001-foundation.md` before changing these choices.
 
 `cmd/loadtest` is a local development tool, not another service. Read `docs/decisions/0003-observability.md` and its operations successor before changing tracing or metrics. Counters survive retention; live gauges still read retained history. Keep OTLP optional and exporter failures redacted.
 
@@ -53,6 +53,7 @@ Run the local checks with:
 gofmt -w cmd internal migrations signature examples
 go vet ./...
 go test -race -count=1 ./...
+go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
 ```
 
 PostgreSQL integration tests require `TEST_DATABASE_URL`. Start the local database with `docker compose up -d postgres --wait`. Tests create isolated schemas and must not truncate existing demo tables. CI requires the test URL and runs the complete suite.
@@ -82,6 +83,14 @@ Prioritize tests for state transitions, retry timing, concurrent claims, crash r
 For operations changes, run `MEASURE_HISTORY=true go test -race -count=1 -v ./internal/store -run TestOperations` (set the environment variable separately in PowerShell) and `promtool test rules ops/alerts.test.yml`, or the documented container equivalent. Run `scripts/recovery-demo.ps1 -SourceProject <webhook-redrive-name>` only against a synthetic local Compose stack; it stops source API/workers temporarily, restores into a fresh project, and preserves volumes/dumps. Never publish database dumps. See `docs/operations.md` for commands and key-handling limits.
 
 Use synthetic endpoints and credentials. Do not connect tests or demos to production systems.
+
+`examples/typescript` is an independent, zero-runtime-dependency Node 24 consumer
+fixture, not an SDK or deployed service. Its SQLite receipt/action transaction
+belongs to the consumer. Run `pnpm --dir examples/typescript check` and
+`pnpm --dir examples/typescript test`.
+`scripts/adoption-demo.ps1` creates a fresh named local project, generates private
+synthetic keys, and kills only its own worker after a committed receiver receipt.
+Publish only its `result.json`, never its generated configuration or certificates.
 
 Name PowerShell command wrappers `Invoke-*`, never after the CLI they call.
 Verify native Linux dispatch as well as the WSL path when changing recovery

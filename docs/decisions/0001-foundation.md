@@ -6,6 +6,12 @@ Status: accepted on 2026-08-27.
 
 Use Go 1.24 with `net/http` for the API, worker client, and synthetic receiver. A worker starts its claimed batch concurrently so each request stays inside one lease window. The standard library covers the current HTTP requirements without a router dependency.
 
+Maintenance update, 2026-10-09: builds and CI now use patched Go 1.26.9, with
+Go 1.26 as the module minimum. Go 1.24 is outside the supported release window.
+Security-driven dependency updates preserve pgx v5, `net/http`, and the existing
+wire/database contracts. Historical verification records retain their actual
+toolchain versions. See [security maintenance](../../SECURITY.md).
+
 ## Database
 
 Use PostgreSQL 17 through pgx v5. PostgreSQL is both the system of record and the work queue. Ingestion inserts an event and its first delivery attempt in one transaction. Workers claim rows with `FOR UPDATE SKIP LOCKED` and a time-bounded lease.

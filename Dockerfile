@@ -1,4 +1,4 @@
-FROM golang:1.24-alpine AS build
+FROM golang:1.26.9-alpine3.23 AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
@@ -11,27 +11,23 @@ RUN CGO_ENABLED=0 go build -trimpath -o /out/api ./cmd/api \
 FROM build AS loadtest-build
 RUN CGO_ENABLED=0 go build -trimpath -o /out/loadtest ./cmd/loadtest
 
-FROM alpine:3.22 AS loadtest
-RUN adduser -D -u 10001 app
+FROM alpine:3.23 AS runtime
+RUN apk upgrade --no-cache && adduser -D -u 10001 app
 USER app
+
+FROM runtime AS loadtest
 COPY --from=loadtest-build /out/loadtest /usr/local/bin/loadtest
 ENTRYPOINT ["loadtest"]
 
-FROM alpine:3.22 AS api
-RUN adduser -D -u 10001 app
-USER app
+FROM runtime AS api
 COPY --from=build /out/api /usr/local/bin/api
 COPY --from=build /out/admin /usr/local/bin/admin
 ENTRYPOINT ["api"]
 
-FROM alpine:3.22 AS worker
-RUN adduser -D -u 10001 app
-USER app
+FROM runtime AS worker
 COPY --from=build /out/worker /usr/local/bin/worker
 ENTRYPOINT ["worker"]
 
-FROM alpine:3.22 AS receiver
-RUN adduser -D -u 10001 app
-USER app
+FROM runtime AS receiver
 COPY --from=build /out/receiver /usr/local/bin/receiver
 ENTRYPOINT ["receiver"]

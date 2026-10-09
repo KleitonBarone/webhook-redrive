@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.1.1 - 2026-10-09
+
+Maintenance release. The public HTTP/signature contracts, delivery engine, and
+database schema are unchanged.
+
+- Move builds and CI to Go 1.26.9 and update dependencies with known security fixes.
+- Check known Go vulnerabilities and API/worker image vulnerabilities in CI.
+- Add an independent TypeScript consumer and an isolated fresh-credential TLS
+  rehearsal covering worker termination, receiver restart, database interruption,
+  and audited recovery. No delivery feature, schema, or required service changes.
+- Record ongoing-ingestion outage measurements and keep circuit breaking deferred.
+
+Source builds now require Go 1.26 or newer; builds and CI use Go 1.26.9. Rebuild
+API and worker images together using the existing stopped-process upgrade
+procedure. No new migration is included. See the [verification record](docs/verification/adoption/README.md)
+and [security maintenance](SECURITY.md). This remains a source release, not a
+production deployment or an independently audited product.
+
 ## v0.1.0
 
 First portfolio release for a small team self-hosting outbound webhook delivery.

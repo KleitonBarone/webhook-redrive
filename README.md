@@ -7,7 +7,11 @@ Milestones 0 through 9 are implemented. The project targets a small team self-ho
 For a first look, follow [a delivery outage in ten minutes](docs/portfolio-demo.md).
 It connects the retry/replay demo to an order application's outbox and receiver
 transactions. The [architecture overview](docs/architecture.md) explains the
-durability boundaries; [release notes](CHANGELOG.md) summarize v0.1.0.
+durability boundaries; [release notes](CHANGELOG.md) summarize v0.1.1.
+
+For an author-performed adoption check with fresh credentials, trusted local TLS,
+an independent TypeScript receiver, and actual process failures, follow the
+[installation rehearsal](docs/adoption.md). It adds no required service.
 
 ## Run the demo
 
@@ -128,7 +132,7 @@ See [the full delivery contract](docs/delivery-contract.md), [foundation decisio
 
 ## Development
 
-Go 1.24 or newer is required. Start the database with one command:
+Go 1.26 or newer is required; builds and CI use patched Go 1.26.9. Start the database with one command:
 
 ```console
 docker compose up -d postgres --wait
@@ -139,6 +143,7 @@ $env:TEST_DATABASE_URL = "postgres://webhook_redrive:local-only-password@localho
 gofmt -w cmd internal migrations signature examples
 go vet ./...
 go test -race -count=1 ./...
+go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
 ```
 
 The race detector requires CGO and a C compiler. Tests create and drop uniquely named schemas; the test database role needs permission to create schemas. Existing demo tables are not truncated. Integration tests skip when the URL is absent locally and fail if it is absent in CI.
@@ -163,8 +168,9 @@ Migration 009 adds endpoint service order and its database sequence. Existing en
 
 ## Next steps
 
-The numbered roadmap is complete through milestone 9. The first source release
-is [v0.1.0](https://github.com/KleitonBarone/webhook-redrive/releases/tag/v0.1.0).
+The numbered roadmap is complete through milestone 9. The latest maintenance
+source release is [v0.1.1](https://github.com/KleitonBarone/webhook-redrive/releases/tag/v0.1.1).
+It updates the runtime and security checks without changing delivery contracts.
 [Fair-claiming comparisons](docs/verification/milestone-9/README.md) show lower
 healthy-delivery delay under local saturation, with the rejected policy and raw
 reports retained. The [ongoing-ingestion outage evaluation](docs/verification/outage-evaluation/README.md)
@@ -172,6 +178,8 @@ found that the existing default endpoint concurrency protected healthy latency
 in its one-unavailable-endpoint case, while failed-request counts stayed unchanged.
 Circuit breaking remains deferred; no milestone 10 is defined.
 These measurements do not establish production capacity. See [ROADMAP.md](ROADMAP.md).
+
+See [security maintenance](SECURITY.md) for supported-source and scanning limits.
 
 ## License
 
