@@ -6,6 +6,10 @@ Webhook Redrive is a reliable webhook delivery service. The hard parts are deliv
 
 Read `README.md` and `ROADMAP.md` before changing scope. Milestones 0 through 9 are implemented. Local load evidence is in `docs/benchmarks/README.md`; it predates authentication and is not production capacity. Operational recovery evidence is in `docs/verification/milestone-8/README.md`; fair-claiming comparisons and restore checks are in `docs/verification/milestone-9/README.md`.
 
+The portfolio walkthrough is `docs/portfolio-demo.md`; architecture boundaries
+are in `docs/architecture.md`. Release verification belongs in
+`docs/verification/release-v0.1.0/README.md`.
+
 ## Product rules
 
 - Delivery is at least once. Do not imply exactly-once delivery.
@@ -70,6 +74,10 @@ Prioritize tests for state transitions, retry timing, concurrent claims, crash r
 For operations changes, run `MEASURE_HISTORY=true go test -race -count=1 -v ./internal/store -run TestOperations` (set the environment variable separately in PowerShell) and `promtool test rules ops/alerts.test.yml`, or the documented container equivalent. Run `scripts/recovery-demo.ps1 -SourceProject <webhook-redrive-name>` only against a synthetic local Compose stack; it stops source API/workers temporarily, restores into a fresh project, and preserves volumes/dumps. Never publish database dumps. See `docs/operations.md` for commands and key-handling limits.
 
 Use synthetic endpoints and credentials. Do not connect tests or demos to production systems.
+
+Name PowerShell command wrappers `Invoke-*`, never after the CLI they call.
+Verify native Linux dispatch as well as the WSL path when changing recovery
+scripts; a function named `Docker` shadows the native command and recurses.
 
 ## Documentation boundaries
 

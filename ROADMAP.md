@@ -165,6 +165,18 @@ Formatting, static analysis, the full race-enabled PostgreSQL suite, the 10,000-
 
 This balances live claims between endpoint registrations, not tenants. In-flight requests still occupy slots until they finish or time out; concurrent claims do not promise strict global round-robin order or a hard latency bound. Reserved pools and health-based prioritization remain deferred. No broker or distributed service was added.
 
+## Release and next-feature evaluation
+
+- [x] Correct native PowerShell Docker dispatch and verify the complete recovery CI job
+- [x] Verify a concise company-use-case walkthrough and publish an architecture overview
+- [x] Package the first source release, v0.1.0, with explicit maturity and contract limits
+- [ ] Measure ongoing ingestion during an unavailable receiver, compare existing endpoint limits, and decide whether circuit breaking warrants milestone 10
+
+The [release verification](docs/verification/release-v0.1.0/README.md) records
+green CI after the recovery-script correction and the local walkthrough.
+Feature evaluation must publish its workload, raw results, and limits before
+changing delivery policy.
+
 ## Later, if justified
 
 - [ ] Endpoint circuit breaking

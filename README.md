@@ -4,6 +4,11 @@ Webhook Redrive accepts events, signs outbound requests, and keeps delivery hist
 
 Milestones 0 through 9 are implemented. The project targets a small team self-hosting outbound webhook delivery. It includes controlled access, ingestion idempotency, audited endpoint maintenance, event investigation, resumable bulk recovery, opt-in retention, database/key recovery procedures, and fair claiming between endpoint backlogs. It is not a production deployment.
 
+For a first look, follow [a delivery outage in ten minutes](docs/portfolio-demo.md).
+It connects the retry/replay demo to an order application's outbox and receiver
+transactions. The [architecture overview](docs/architecture.md) explains the
+durability boundaries; [release notes](CHANGELOG.md) summarize v0.1.0.
+
 ## Run the demo
 
 Requires Docker Compose and PowerShell 7 for the verification script.
