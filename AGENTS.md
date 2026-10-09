@@ -69,6 +69,10 @@ Set `API_TOKEN` to the synthetic Compose credential documented in README before 
 
 Use `scripts/measure-load.ps1` for paced-load/database evidence. Its benchmark override and statement statistics belong only on fresh local projects. Preserve raw reports, exclude invalid timing, and check statistics reset/eviction before comparing deltas. The saturation workload assumes one ten-slot worker; it does not prove multi-worker fairness.
 
+The `outage` load scenario requires an even event count and positive rate. It
+alternates new timeout and healthy events, uses two-attempt `demo` cycles, and
+must not be described as the longer endpoint retry profile named `outage`.
+
 Prioritize tests for state transitions, retry timing, concurrent claims, crash recovery, signature verification, rate limits, and replay. Use a controllable clock and deterministic jitter in tests.
 
 For operations changes, run `MEASURE_HISTORY=true go test -race -count=1 -v ./internal/store -run TestOperations` (set the environment variable separately in PowerShell) and `promtool test rules ops/alerts.test.yml`, or the documented container equivalent. Run `scripts/recovery-demo.ps1 -SourceProject <webhook-redrive-name>` only against a synthetic local Compose stack; it stops source API/workers temporarily, restores into a fresh project, and preserves volumes/dumps. Never publish database dumps. See `docs/operations.md` for commands and key-handling limits.

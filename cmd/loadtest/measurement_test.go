@@ -84,3 +84,30 @@ func TestSaturationMixAndValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestOutageMixAndValidation(t *testing.T) {
+	for i := 0; i < 100; i++ {
+		want := "success"
+		if i%2 == 0 {
+			want = "timeout"
+		}
+		if got := kindFor("outage", i); got != want {
+			t.Fatalf("event %d: got %s, want %s", i, got, want)
+		}
+	}
+	c := config{API: "http://localhost:8080", History: "http://localhost:9090", Receiver: "http://receiver:9090", Events: 100, Concurrency: 10, Scenario: "outage", SlowEndpoints: 1, SlowConcurrency: 10, Deadline: time.Minute, Rate: 10}
+	if err := validate(c); err != nil {
+		t.Fatal(err)
+	}
+	for _, change := range []func(*config){
+		func(c *config) { c.Events = 99 }, func(c *config) { c.Rate = 0 },
+		func(c *config) { c.SlowEndpoints = 0 }, func(c *config) { c.SlowEndpoints = 11 },
+		func(c *config) { c.SlowConcurrency = 0 }, func(c *config) { c.SlowConcurrency = 11 },
+	} {
+		invalid := c
+		change(&invalid)
+		if validate(invalid) == nil {
+			t.Fatalf("accepted %+v", invalid)
+		}
+	}
+}

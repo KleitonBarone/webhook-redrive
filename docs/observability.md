@@ -100,6 +100,20 @@ CI runs small mixed, fairness, and paced saturation workloads as correctness che
 
 `saturation` first queues 30 timeout events without pacing, spread across `-slow-endpoints`. Each timeout endpoint has `-slow-concurrency` permits. The tool confirms `min(10, endpoints * concurrency)` active claims before sending the remaining healthy events at the requested rate. Use the default ten-slot worker and an otherwise idle stack. The slow backlog is finite, not a permanent outage stream.
 
+`outage` alternates new timeout and healthy events throughout paced ingestion.
+It needs an even event count and a positive `-rate`. Half the offered rate goes
+to each cohort. `-slow-endpoints` and `-slow-concurrency` control the timeout
+registrations; healthy concurrency is 10. Unlike `saturation`, it does not prime
+a slow backlog or stop creating timeout events when healthy ingestion begins.
+It still uses the explicit short `demo` retry profile and two attempts, not the
+longer endpoint retry profile named `outage`. The receiver stays unavailable for
+the entire finite workload, including drain. Reports reconcile every event,
+attempt, signature, body hash, and metric delta before being saved.
+
+```console
+go run ./cmd/loadtest -scenario outage -events 360 -rate 6 -slow-endpoints 1 -slow-concurrency 10 -sample-interval 1s -deadline 10m
+```
+
 The report's `timing_check` marks timing invalid when the client's wall clock and monotonic elapsed time differ by over 50 ms, a stored event duration is negative, or it exceeds the observed request-to-inspection interval by over 50 ms. Correctness evidence is retained even when timing is invalid. Passing this check does not prove remote clock synchronization or detect every clock anomaly.
 
 ### Measure database cost locally

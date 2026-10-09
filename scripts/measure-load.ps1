@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('success','saturation')][string]$Scenario = 'success',
+    [ValidateSet('success','saturation','outage')][string]$Scenario = 'success',
     [ValidateRange(40,10000)][int]$Events = 3000,
     [ValidateRange(0,1000)][int]$Rate = 50,
     [ValidateRange(1,10)][int]$SlowEndpoints = 1,

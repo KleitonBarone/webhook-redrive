@@ -84,15 +84,15 @@ func main() {
 	flag.StringVar(&c.API, "api", "http://localhost:8080", "local API URL")
 	flag.StringVar(&c.Receiver, "receiver", "http://receiver:9090", "synthetic receiver URL as seen by the worker")
 	flag.StringVar(&c.History, "history", "http://localhost:9090", "local receiver history URL")
-	flag.StringVar(&c.Scenario, "scenario", "success", "success, retry, mixed, fairness, or saturation")
+	flag.StringVar(&c.Scenario, "scenario", "success", "success, retry, mixed, fairness, saturation, or outage")
 	flag.StringVar(&c.Output, "output", "", "optional JSON report path")
 	flag.StringVar(&c.Revision, "revision", "working-tree", "source revision label recorded in the report")
 	flag.IntVar(&c.Events, "events", 200, "finite number of events; mixed needs multiples of 20, fairness of 10")
 	flag.IntVar(&c.Concurrency, "concurrency", 10, "concurrent ingestion clients")
 	flag.DurationVar(&c.Deadline, "deadline", 2*time.Minute, "whole workload deadline")
 	flag.IntVar(&c.Rate, "rate", 0, "paced ingestion starts per second, 0 for an unpaced burst")
-	flag.IntVar(&c.SlowEndpoints, "slow-endpoints", 1, "timeout endpoints in saturation, 1..10")
-	flag.IntVar(&c.SlowConcurrency, "slow-concurrency", 10, "per-timeout-endpoint limit in saturation, 1..10")
+	flag.IntVar(&c.SlowEndpoints, "slow-endpoints", 1, "timeout endpoints in saturation/outage, 1..10")
+	flag.IntVar(&c.SlowConcurrency, "slow-concurrency", 10, "per-timeout-endpoint limit in saturation/outage, 1..10")
 	flag.DurationVar(&c.SampleInterval, "sample-interval", 0, "queue sampling interval, 0 to disable or 1s..1m")
 	flag.Parse()
 	if err := validate(c); err != nil {
@@ -132,11 +132,14 @@ func validate(c config) error {
 	if c.SampleInterval != 0 && (c.SampleInterval < time.Second || c.SampleInterval > time.Minute) {
 		return errors.New("sample interval must be 0 or 1s..1m")
 	}
-	if c.Scenario != "success" && c.Scenario != "retry" && c.Scenario != "mixed" && c.Scenario != "fairness" && c.Scenario != "saturation" {
-		return errors.New("scenario must be success, retry, mixed, fairness, or saturation")
+	if c.Scenario != "success" && c.Scenario != "retry" && c.Scenario != "mixed" && c.Scenario != "fairness" && c.Scenario != "saturation" && c.Scenario != "outage" {
+		return errors.New("scenario must be success, retry, mixed, fairness, saturation, or outage")
 	}
 	if c.Scenario == "saturation" && (c.Events < 40 || c.SlowEndpoints < 1 || c.SlowEndpoints > 10 || c.SlowConcurrency < 1 || c.SlowConcurrency > 10) {
 		return errors.New("saturation needs at least 40 events and slow endpoints/concurrency in 1..10")
+	}
+	if c.Scenario == "outage" && (c.Events%2 != 0 || c.Rate == 0 || c.SlowEndpoints < 1 || c.SlowEndpoints > 10 || c.SlowConcurrency < 1 || c.SlowConcurrency > 10) {
+		return errors.New("outage needs an even event count, a positive rate, and slow endpoints/concurrency in 1..10")
 	}
 	if c.Scenario == "mixed" && c.Events%20 != 0 {
 		return errors.New("mixed events must be a multiple of 20")
@@ -161,6 +164,12 @@ func validate(c config) error {
 }
 
 func kindFor(scenario string, i int) string {
+	if scenario == "outage" {
+		if i%2 == 0 {
+			return "timeout"
+		}
+		return "success"
+	}
 	if scenario == "saturation" {
 		if i < 30 {
 			return "timeout"
@@ -232,7 +241,7 @@ func run(c config) (report, error) {
 			concurrency = 2
 		}
 		count := 1
-		if c.Scenario == "saturation" && kind == "timeout" {
+		if (c.Scenario == "saturation" || c.Scenario == "outage") && kind == "timeout" {
 			count, concurrency = c.SlowEndpoints, c.SlowConcurrency
 			r.SlowEndpoints, r.SlowConcurrency = count, concurrency
 		}
@@ -264,7 +273,11 @@ func run(c config) (report, error) {
 				begin := time.Now()
 				var event store.Event
 				targets := endpoints[kind]
-				if err := call(ctx, client, "POST", api+"/v1/endpoints/"+targets[i%len(targets)]+"/events", payload, 202, &event); err != nil {
+				index := i
+				if c.Scenario == "outage" {
+					index /= 2 // Alternate cohorts without skipping every other endpoint.
+				}
+				if err := call(ctx, client, "POST", api+"/v1/endpoints/"+targets[index%len(targets)]+"/events", payload, 202, &event); err != nil {
 					failures <- err
 					cancel()
 					return

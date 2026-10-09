@@ -81,6 +81,8 @@ jobs:
         run: go run ./cmd/loadtest -scenario mixed -events 40 -revision "$GITHUB_SHA" -output load-result.json
       - name: Verify healthy deliveries beside timeouts
         run: go run ./cmd/loadtest -scenario fairness -events 40 -revision "$GITHUB_SHA" -output fairness-result.json
+      - name: Verify ongoing healthy and outage ingestion
+        run: go run ./cmd/loadtest -scenario outage -events 40 -rate 10 -slow-concurrency 10 -revision "$GITHUB_SHA" -output outage-result.json
       - name: Stop demo before isolated measurement
         run: docker compose stop
       - name: Verify paced saturation and database evidence
@@ -93,6 +95,7 @@ jobs:
           path: |
             load-result.json
             fairness-result.json
+            outage-result.json
             artifacts/benchmark/**/*.json
       - name: Show logs on failure
         if: failure()
