@@ -66,7 +66,7 @@ The Compose demo checks pause/resume and endpoint audit. Run `go test -race -cou
 
 Run `go test -race -count=1 -v ./internal/integration -run '^TestInvestigationRecoveryDemo$'` for window search, preview, lost recovery acknowledgement, fresh API/pool resumption, eligibility rechecks, and endpoint limits. Store tests inject an item-result write failure to prove replay/result atomicity and run competing recoveries. Do not replace these with timing assertions.
 
-Set `API_TOKEN` to the synthetic Compose credential documented in README before running `go run ./cmd/loadtest -scenario mixed -events 40` and `go run ./cmd/loadtest -scenario fairness -events 40` on an isolated idle local stack. Publish real JSON results with their revision and environment; do not turn shared-runner timing into performance assertions.
+Set `API_TOKEN` to the synthetic Compose credential documented in `docs/api.md` before running `go run ./cmd/loadtest -scenario mixed -events 40` and `go run ./cmd/loadtest -scenario fairness -events 40` on an isolated idle local stack. Publish real JSON results with their revision and environment; do not turn shared-runner timing into performance assertions.
 
 Use `scripts/measure-load.ps1` for paced-load/database evidence. Its benchmark override and statement statistics belong only on fresh local projects. Preserve raw reports, exclude invalid timing, and check statistics reset/eviction before comparing deltas. The saturation workload assumes one ten-slot worker; it does not prove multi-worker fairness.
 
@@ -98,4 +98,4 @@ scripts; a function named `Docker` shadows the native command and recurses.
 
 ## Documentation boundaries
 
-Keep human setup, usage, guarantees, and limitations in `README.md`. Keep agent operating rules here. Update `ROADMAP.md` when a milestone changes, not after the work has quietly drifted.
+Keep the first-time overview, demo, and essential limitations in `README.md`; link detailed usage and configuration in `docs/`. Keep agent operating rules here. Update `ROADMAP.md` when a milestone changes, not after the work has quietly drifted.

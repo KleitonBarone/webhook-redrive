@@ -69,7 +69,7 @@ Only classified retryable failures are retried. Backoff doubles up to the cap, w
 
 Attempt history includes `expires_at`, resolved retry delays, and the endpoint/signing versions used by its last claim. Expiration produces `dead_letter` with `event_expired`; it does not erase payloads or release ingestion keys. Paused work can expire without any send. A request started before expiration can still succeed within its timeout and lease. The worker processes expiration, so terminal-state visibility can lag while workers are stopped or busy.
 
-After repairing an expired or exhausted event, [explicit replay](../README.md#api) starts a new cycle with the current policy. It does not change old attempts. Repeating that replay request does not extend the deadline. Delivery remains at least once, and receivers still need durable business deduplication.
+After repairing an expired or exhausted event, [explicit replay](api.md#replay-a-failed-event) starts a new cycle with the current policy. It does not change old attempts. Repeating that replay request does not extend the deadline. Delivery remains at least once, and receivers still need durable business deduplication.
 
 ## Rotate a signing secret
 
@@ -85,7 +85,7 @@ The sender replaces the old ciphertext at rotation. Retirement closes the transi
 
 ## Run the lifecycle demo
 
-With local PostgreSQL and `TEST_DATABASE_URL` set as in the [development instructions](../README.md#development):
+With local PostgreSQL and `TEST_DATABASE_URL` set as in the [development instructions](development.md#run-the-checks):
 
 ```console
 go test -race -count=1 -v ./internal/integration -run '^TestEndpointLifecycleDemo$'

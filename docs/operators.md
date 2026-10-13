@@ -105,7 +105,7 @@ Replay preserves old history and uses current endpoint policy and a fresh deadli
 
 ## Run the recovery demo
 
-With local PostgreSQL and `TEST_DATABASE_URL` configured as in the [development instructions](../README.md#development):
+With local PostgreSQL and `TEST_DATABASE_URL` configured as in the [development instructions](development.md#run-the-checks):
 
 ```console
 go test -race -count=1 -v ./internal/integration -run '^TestInvestigationRecoveryDemo$'
